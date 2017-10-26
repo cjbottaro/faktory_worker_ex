@@ -10,8 +10,7 @@ defmodule Faktory.Job do
       end
 
       def perform_async(options, args) do
-        IO.inspect(options)
-        perform(args)
+        Faktory.push(__MODULE__, options, args)
       end
 
       def set(options) do

@@ -27,7 +27,7 @@ defmodule Faktory.Configuration do
   defmacro __before_compile__(_env) do
     quote do
       def all do
-        import Faktory.Configuration, only: [new_wid: 0]
+        import Faktory.Utils, only: [new_wid: 0]
         config = @config
           |> dynamic
           |> Keyword.put_new(:wid, new_wid())
@@ -69,10 +69,6 @@ defmodule Faktory.Configuration do
 
   def merge(old, new) do
     Keyword.merge(old, new)
-  end
-
-  def new_wid do
-    :crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)
   end
 
 end

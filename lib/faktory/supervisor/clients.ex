@@ -25,9 +25,7 @@ defmodule Faktory.Supervisor.Clients do
       max_overflow: 2
     ]
 
-    [
-      :poolboy.child_spec(config_module, pool_options, config)
-    ]
+    [:poolboy.child_spec(config_module, pool_options, config)]
   end
 
 end
