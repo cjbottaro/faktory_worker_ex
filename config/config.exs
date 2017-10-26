@@ -10,11 +10,11 @@ use Mix.Config
 
 # You can configure your application as:
 #
-#     config :faktory_worker_elixir, key: :value
+#     config :faktory_worker_ex, key: :value
 #
 # and access this configuration in your application as:
 #
-#     Application.get_env(:faktory_worker_elixir, :key)
+#     Application.get_env(:faktory_worker_ex, :key)
 #
 # You can also configure a 3rd-party app:
 #
