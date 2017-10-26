@@ -4,9 +4,6 @@ Elixir worker for Faktory ([blog](http://www.mikeperham.com/2017/10/24/introduci
 
 ## Installation
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `faktory_worker_ex` to your list of dependencies in `mix.exs`:
-
 ```elixir
 def deps do
   [
