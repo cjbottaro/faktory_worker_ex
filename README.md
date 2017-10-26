@@ -1,6 +1,6 @@
 # Faktory Worker Ex
 
-Elixir worker for [Faktory](https://github.com/contribsys/faktory).
+Elixir worker for Faktory ([blog](http://www.mikeperham.com/2017/10/24/introducing-faktory/)) ([github](https://github.com/contribsys/faktory)).
 
 ## Installation
 
