@@ -1,13 +1,14 @@
 defmodule Faktory.Configuration do
 
-  defmacro __using__(for_what) do
-    quote do
+  defmacro __using__(type) do
+    quote bind_quoted: [type: type] do
       import Faktory.Configuration, only: [merge: 2, host: 1, port: 1]
 
       # Common defaults
       @config [host: "localhost", port: 7419]
+      @config_type type # @type is special, can't use it.
 
-      case unquote(for_what) do
+      case type do
         :client ->
           @config merge(@config, pool: 10)
           import Faktory.Configuration, only: [pool: 1]
@@ -27,9 +28,9 @@ defmodule Faktory.Configuration do
     quote do
       def all do
         import Faktory.Configuration, only: [new_wid: 0]
-        @config
+        config = @config
           |> dynamic
-          |> Keyword.put(:wid, new_wid())
+          |> Keyword.put_new(:wid, new_wid())
           |> Enum.map(fn {k, v} -> {k |> to_string |> String.to_atom, v} end)
           |> Map.new
       end

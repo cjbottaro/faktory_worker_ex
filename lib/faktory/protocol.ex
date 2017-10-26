@@ -63,6 +63,17 @@ defmodule Faktory.Protocol do
     end
   end
 
+  def info(conn) do
+    with :ok <- tx(conn, "INFO"),
+      {:ok, info} <- rx(conn)
+    do
+      info && Poison.decode!(info)
+    else
+      {:error, :closed} -> info(conn)  # Retries forever and without delay!
+      {:error, message} = error -> error
+    end
+  end
+
   def tx(conn, payload) do
     Connection.send(conn, "#{payload}\r\n")
   end
