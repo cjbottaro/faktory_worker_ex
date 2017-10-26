@@ -8,6 +8,16 @@ defmodule Faktory.Mixfile do
       elixir: "~> 1.5",
       start_permanent: Mix.env == :prod,
       deps: deps(),
+
+      # Hex
+      description: "Elixir worker for Faktory",
+      package: [
+        maintainers: ["Christopher J. Bottaro"],
+        licenses: ["GNU General Public License v3.0"],
+        links: %{"GitHub" => "https://github.com/cjbottaro/faktory_worker_ex"},
+      ],
+
+      # Docs
       docs: [
         main: "README",
         extras: ["README.md": [title: "README"]]

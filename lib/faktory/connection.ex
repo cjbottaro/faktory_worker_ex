@@ -103,7 +103,7 @@ defmodule Faktory.Connection do
 
   defp handshake!(socket, wid) do
     :inet.setopts(socket, packet: :line)
-    {:ok, <<"+HI", rest::binary>>} = :gen_tcp.recv(socket, 0)
+    {:ok, <<"+HI", _rest::binary>>} = :gen_tcp.recv(socket, 0)
 
     payload = %{
       wid: wid,
