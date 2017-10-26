@@ -14,9 +14,21 @@ defmodule Faktory.Utils do
       Map.put(acc, to_string(k), v)
     end
   end
-  
+
   def new_wid do
     :crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)
+  end
+
+  def stringify(thing) do
+    try do
+      to_string(thing)
+    rescue
+      Protocol.UndefinedError -> inspect(thing)
+    end
+  end
+
+  def now_in_ms do
+    :os.system_time(:milli_seconds)
   end
 
 end
