@@ -6,10 +6,18 @@ defmodule Faktory.Supervisor do
   end
 
   def init(nil) do
-    Supervisor.init([
-      Faktory.Supervisor.Clients,
-      Faktory.Supervisor.Workers,
-    ], strategy: :one_for_one)
+
+    # Only start the workers from the mix task.
+    children = if Faktory.start_workers? do
+      [Faktory.Supervisor.Workers]
+    else
+      []
+    end
+
+    # Always start the clients supervisor.
+    children = [Faktory.Supervisor.Clients | children]
+
+    Supervisor.init(children, strategy: :one_for_one)
   end
 
 end

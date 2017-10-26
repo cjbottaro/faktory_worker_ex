@@ -1,20 +1,20 @@
 defmodule Faktory.Configuration do
 
   defmacro __using__(type) do
-    quote bind_quoted: [type: type] do
-      import Faktory.Configuration, only: [merge: 2, host: 1, port: 1]
+    quote do
+
+      import Faktory.Configuration, only: [host: 1, port: 1, pool: 1, concurrency: 1, queues: 1]
+      import Keyword, only: [merge: 2]
 
       # Common defaults
       @config [host: "localhost", port: 7419]
-      @config_type type # @type is special, can't use it.
+      @config_type unquote(type) # @type is special, can't use it.
 
-      case type do
+      case unquote(type) do
         :client ->
           @config merge(@config, pool: 10)
-          import Faktory.Configuration, only: [pool: 1]
         :worker ->
           @config merge(@config, concurrency: 20, queues: ["default"])
-          import Faktory.Configuration, only: [concurrency: 1, queues: 1]
       end
 
       def dynamic(config), do: config

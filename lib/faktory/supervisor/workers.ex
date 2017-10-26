@@ -6,8 +6,17 @@ defmodule Faktory.Supervisor.Workers do
   end
 
   def init(nil) do
-    Supervisor.init([
-    ], strategy: :one_for_one)
+    config_module = Faktory.worker_config_module
+    config = config_module.all
+
+    children = Enum.map 1..config.concurrency, fn i ->
+      Supervisor.child_spec(
+        {Faktory.Manager, config},
+        id: {Faktory.Worker, config_module, i}
+      )
+    end
+
+    Supervisor.init(children, strategy: :one_for_one)
   end
 
 end

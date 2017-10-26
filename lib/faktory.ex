@@ -5,6 +5,14 @@ defmodule Faktory do
 
   alias Faktory.{Protocol, Utils}
 
+  def start_workers? do
+    !!Application.get_env(:faktory, :start_workers)
+  end
+
+  def worker_config_module do
+    Application.get_env(:faktory, :worker_config)
+  end
+
   def push(module, options, args) do
     jobtype = Utils.normalize_jobtype(module)
     job = options
