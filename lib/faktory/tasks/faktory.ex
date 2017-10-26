@@ -8,7 +8,7 @@ defmodule Mix.Tasks.Faktory do
     IO.inspect args
 
     # Signify that we want to start the workers.
-    Application.put_env(:faktory, :start_workers, true)
+    Faktory.put_env(:start_workers, true)
 
     # Easy enough.
     Mix.Task.run "app.start"
@@ -19,7 +19,7 @@ defmodule Mix.Tasks.Faktory do
   defp shh_just_go_to_sleep do
     receive do
       something ->
-        Logger.warn("Uh oh, main process received a message: #{inspect(something)}")
+        Logger.warn("!!! Uh oh, main process received a message: #{inspect(something)}")
     end
     shh_just_go_to_sleep()
   end

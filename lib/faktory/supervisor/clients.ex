@@ -10,7 +10,7 @@ defmodule Faktory.Supervisor.Clients do
   end
 
   def children do
-    Application.get_env(:faktory, :client_config) |> children
+    children(Faktory.client_config_module)
   end
 
   def children(nil), do: []
