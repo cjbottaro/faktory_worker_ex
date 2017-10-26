@@ -15,7 +15,7 @@ defmodule Faktory.Protocol do
       job["jid"]
     else
       {:error, :closed} -> push(conn, job) # Retries forever and without delay!
-      {:error, message} = error -> error
+      {:error, _message} = error -> error
     end
   end
 
@@ -30,7 +30,7 @@ defmodule Faktory.Protocol do
       job && Poison.decode!(job)
     else
       {:error, :closed} -> fetch(conn, queues)  # Retries forever and without delay!
-      {:error, message} = error -> error
+      {:error, _message} = error -> error
     end
   end
 
@@ -42,7 +42,7 @@ defmodule Faktory.Protocol do
       {:ok, jid}
     else
       {:error, :closed} -> ack(conn, jid)  # Retries forever and without delay!
-      {:error, message} = error -> error
+      {:error, _message} = error -> error
     end
   end
 
@@ -59,7 +59,7 @@ defmodule Faktory.Protocol do
       {:ok, jid}
     else
       {:error, :closed} -> fail(conn, jid, errtype, message, backtrace)  # Retries forever and without delay!
-      {:error, message} = error -> error
+      {:error, _message} = error -> error
     end
   end
 
@@ -70,7 +70,22 @@ defmodule Faktory.Protocol do
       info && Poison.decode!(info)
     else
       {:error, :closed} -> info(conn)  # Retries forever and without delay!
-      {:error, message} = error -> error
+      {:error, _message} = error -> error
+    end
+  end
+
+  def beat(conn, wid) do
+    payload = %{wid: wid} |> Poison.encode!
+    with :ok <- tx(conn, "BEAT #{payload}"),
+      {:ok, response} <- rx(conn)
+    do
+      case response do
+        "OK" -> :ok
+        info -> {:ok, Poison.decode!(info)["signal"]}
+      end
+    else
+      {:error, :closed} -> beat(conn, wid) # Retries forever and without delay!
+      {:error, _message} = error -> error
     end
   end
 

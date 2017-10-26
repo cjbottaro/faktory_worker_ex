@@ -16,6 +16,8 @@ defmodule Faktory.Supervisor.Workers do
       )
     end
 
+    children = [{Faktory.Heartbeat, config.wid} | children]
+
     Supervisor.init(children, strategy: :one_for_one)
   end
 

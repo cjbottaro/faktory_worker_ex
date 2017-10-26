@@ -3,6 +3,10 @@ defmodule Faktory do
   Documentation for Faktory.
   """
 
+  # This should match what's in mix.exs. I couldn't figure out how to just
+  # use what's in mix.exs. That would be nice.
+  @app_name :faktory_worker_ex
+
   alias Faktory.{Protocol, Utils}
 
   def start_workers? do
@@ -25,15 +29,19 @@ defmodule Faktory do
     with_conn(&Protocol.push(&1, job))
   end
 
+  def info do
+    with_conn(&Protocol.info(&1))
+  end
+
   def get_env(key) do
-     Application.get_env(:faktory_worker_ex, key)
+     Application.get_env(@app_name, key)
   end
 
   def put_env(key, value) do
-    Application.put_env(:faktory_worker_ex, key, value)
+    Application.put_env(@app_name, key, value)
   end
 
-  defp with_conn(func) do
+  def with_conn(func) do
     :poolboy.transaction(client_config_module(), func)
   end
 
