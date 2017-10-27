@@ -45,13 +45,13 @@ defmodule Faktory do
   @spec push(atom | binary, Keyword.t, [term]) :: jid
   def push(module, options, args) do
     import Faktory.Utils, only: [new_jid: 0]
-    
+
     jobtype = Utils.normalize_jobtype(module)
     job = options
       |> Keyword.merge(jid: new_jid(), jobtype: jobtype, args: args)
       |> Utils.stringify_keys
 
-    traverse_middleware(job, client_config_module.all.middleware)
+    traverse_middleware(job, client_config_module().all.middleware)
   end
 
   defp traverse_middleware(job, []) do
