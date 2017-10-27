@@ -78,6 +78,17 @@ defmodule Faktory do
     with_conn(&Protocol.info(&1))
   end
 
+  @doc """
+  Flush (clear) the Faktory db.
+
+  All job info will be lost.
+  Checks out a connection from the _client_ pool.
+  """
+  @spec flush :: :ok | {:error, binary}
+  def flush do
+    with_conn(&Protocol.flush(&1))
+  end
+
   @doc false
   def get_env(key) do
      Application.get_env(@app_name, key)

@@ -89,6 +89,17 @@ defmodule Faktory.Protocol do
     end
   end
 
+  def flush(conn) do
+    with :ok <- tx(conn, "FLUSH"),
+      {:ok, "OK"} <- rx(conn)
+    do
+      :ok
+    else
+      {:error, :closed} -> flush(conn) # Retries forever and without delay!
+      {:error, _message} = error -> error
+    end
+  end
+
   def tx(conn, payload) do
     Connection.send(conn, "#{payload}\r\n")
   end
