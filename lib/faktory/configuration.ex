@@ -66,11 +66,13 @@ defmodule Faktory.Configuration do
   defmacro __using__(type) do
     quote do
 
-      import Faktory.Configuration, only: [host: 1, port: 1, pool: 1, concurrency: 1, queues: 1]
+      import Faktory.Configuration, only: [
+        host: 1, port: 1, pool: 1, concurrency: 1, queues: 1, middleware: 1
+      ]
       import Keyword, only: [merge: 2]
 
       # Common defaults
-      @config [host: "localhost", port: 7419]
+      @config [host: "localhost", port: 7419, middleware: []]
       @config_type unquote(type) # @type is special, can't use it.
 
       case unquote(type) do
@@ -157,6 +159,18 @@ defmodule Faktory.Configuration do
   defmacro queues(queues) do
     quote do
       @config Keyword.merge(@config, queues: unquote(queues))
+    end
+  end
+
+  @doc """
+  Set the middleware chain to use.
+
+  Valid for both client and worker configurations. Default `[]`
+  """
+  @spec middleware([module]) :: Keyword.t
+  defmacro middleware(chain) do
+    quote do
+      @config Keyword.merge(@config, middleware: unquote(chain))
     end
   end
 

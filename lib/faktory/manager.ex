@@ -71,7 +71,7 @@ defmodule Faktory.Manager do
 
   # If we have a job, then run it in a separate, monitored process and just wait.
   def execute(%{job: job} = state) do
-    {:ok, worker_pid} = Worker.start_link(self())
+    {:ok, worker_pid} = Worker.start_link(self(), state.middleware)
     Process.monitor(worker_pid)
     GenServer.cast(worker_pid, {:run, job})
 
