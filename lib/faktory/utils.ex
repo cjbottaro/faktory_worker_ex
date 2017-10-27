@@ -1,5 +1,6 @@
 defmodule Faktory.Utils do
-
+  @moduledoc false
+  
   def normalize_jobtype(string) when is_binary(string) do
     String.replace_prefix(string, "Elixir.", "")
   end

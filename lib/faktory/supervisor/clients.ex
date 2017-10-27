@@ -1,4 +1,5 @@
 defmodule Faktory.Supervisor.Clients do
+  @moduledoc false
   use Supervisor
 
   def start_link(_arg) do

@@ -1,4 +1,67 @@
 defmodule Faktory.Configuration do
+  @moduledoc """
+  Configure clients (enqueuing) and workers (dequeing/processing).
+
+  Client configuration is for enqueuing jobs. Worker configuration is for
+  dequeing and processing jobs. You may have an app that only needs one or the
+  other... or both!
+
+  Configuration is done by defining modules then telling `faktory_worker_ex` about them.
+
+  ### Compile time configuration
+
+  ```elixir
+    defmodule ClientConfig do
+      use Faktory.Configuration, :client
+
+      host "localhost"
+      port 7419
+      pool 10
+    end
+
+    defmodule WorkerConfig do
+      use Faktory.Configuration, :client
+
+      host "localhost"
+      port 7419
+      concurrency 20
+      queues ["default"]
+    end
+  ```
+
+  All the configuration options have sane defaults (pretty much exactly what
+  the example above shows).
+
+  ### Runtime configuration
+
+  You can set/update any configuration at runtime by defining a method.
+
+  ```elixir
+  defmodule ClientConfig do
+    use Faktory.Configuration, :client
+
+    def update(old_config) do
+      new_config = Keyword.put(old_config, :pool, old_config[:pool] + 1)
+      new_config
+    end
+  end
+  ```
+
+  ### Activating the configuration.
+
+  In your Mix Config files (`config/config.exs`)...
+
+  ```elixir
+  use Mix.Config
+
+  config :faktory_worker_ex,
+    client_config: ClientConfig,
+    worker_config: WorkerConfig
+  ```
+
+  Note that workers will only run via the mix task (`mix faktory`), despite
+  having an active worker configuration!
+  """
 
   defmacro __using__(type) do
     quote do
@@ -17,8 +80,8 @@ defmodule Faktory.Configuration do
           @config merge(@config, concurrency: 20, queues: ["default"])
       end
 
-      def dynamic(config), do: config
-      defoverridable [dynamic: 1]
+      def update(config), do: config
+      defoverridable [update: 1]
 
       @before_compile Faktory.Configuration
     end
@@ -29,7 +92,7 @@ defmodule Faktory.Configuration do
       def all do
         import Faktory.Utils, only: [new_wid: 0]
         config = @config
-          |> dynamic
+          |> update
           |> Keyword.put_new(:wid, new_wid())
           |> Enum.map(fn {k, v} -> {k |> to_string |> String.to_atom, v} end)
           |> Map.new
@@ -37,38 +100,64 @@ defmodule Faktory.Configuration do
     end
   end
 
+  @doc """
+  Set the host to connect to.
+
+  Valid for both client and worker configuration. Default `"localhost"`
+  """
+  @spec host(String.t) :: Keyword.t
   defmacro host(host) do
     quote do
-      @config merge(@config, host: unquote(host))
+      @config Keyword.merge(@config, host: unquote(host))
     end
   end
 
+  @doc """
+  Set the port to connect to.
+
+  Valid for both client and worker configuration. Default `7419`
+  """
+  @spec port(integer) :: Keyword.t
   defmacro port(port) do
     quote do
-      @config merge(@config, port: unquote(port))
+      @config Keyword.merge(@config, port: unquote(port))
     end
   end
 
+  @doc """
+  Set the connection pool size.
+
+  Valid for only client configuration. Default `10`
+  """
+  @spec pool(integer) :: Keyword.t
   defmacro pool(pool) do
     quote do
-      @config merge(@config, pool: unquote(pool))
+      @config Keyword.merge(@config, pool: unquote(pool))
     end
   end
 
+  @doc """
+  Set the max number of concurrent jobs that can be processed at a time.
+
+  Valid only for worker configuration. Default `20`
+  """
+  @spec concurrency(integer) :: Keyword.t
   defmacro concurrency(concurrency) do
     quote do
-      @config merge(@config, concurrency: unquote(concurrency))
+      @config Keyword.merge(@config, concurrency: unquote(concurrency))
     end
   end
 
+  @doc """
+  Set the queues to fetch jobs from.
+
+  Valid only for worker configuration. Default `["default"]`
+  """
+  @spec queues([String.t]) :: Keyword.t
   defmacro queues(queues) do
     quote do
-      @config merge(@config, queues: unquote(queues))
+      @config Keyword.merge(@config, queues: unquote(queues))
     end
-  end
-
-  def merge(old, new) do
-    Keyword.merge(old, new)
   end
 
 end

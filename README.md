@@ -53,7 +53,7 @@ config :faktory_worker_ex,
   worker_config: MyWorkerConfig
 ```
 
-Dynamic runtime configuration will be covered in the hexdocs.
+Runtime configuration will be covered in the hexdocs.
 
 ## Define a job module
 

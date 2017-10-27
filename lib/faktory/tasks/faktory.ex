@@ -1,9 +1,22 @@
 defmodule Mix.Tasks.Faktory do
+  @moduledoc """
+  Use this to start up the worker and start shreddin through your work!
+
+  `mix faktory`
+
+  Currently it doen not take any arguments; all configuation is done through
+  the configuation modules. In the future, I'd like to add command line args
+  that take precedence over the config modules. At least
+    * `--concurrency`
+    * `--queues`
+  """
+
   use Mix.Task
   require Logger
 
   @shortdoc "Start Faktory worker"
 
+  @doc false
   def run(args) do
     IO.inspect args
 

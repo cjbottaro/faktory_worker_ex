@@ -19,7 +19,10 @@ defmodule Faktory.Mixfile do
 
       # Docs
       docs: [
-        extras: ["README.md": [title: "README"]]
+        extras: [
+          "README.md": [title: "README"],
+          "Architecture.md": [title: "Architecture"],
+        ]
       ]
     ]
   end

@@ -1,4 +1,5 @@
 defmodule Faktory.Protocol do
+  @moduledoc false
 
   alias Faktory.Connection
   import Connection, only: [recv: 2]
