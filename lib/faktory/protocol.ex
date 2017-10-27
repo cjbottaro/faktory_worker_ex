@@ -7,7 +7,6 @@ defmodule Faktory.Protocol do
   def push(conn, job) when is_list(job), do: push(conn, Map.new(job))
 
   def push(conn, job) do
-    job = Map.put_new(job, "jid", new_jid())
     payload = Poison.encode!(job)
 
     with :ok <- tx(conn, "PUSH #{payload}"),
@@ -121,10 +120,6 @@ defmodule Faktory.Protocol do
       {:ok, _} -> retval
       {:error, _} = error -> error
     end
-  end
-
-  defp new_jid do
-    :crypto.strong_rand_bytes(12) |> Base.encode16(case: :lower)
   end
 
 end

@@ -44,10 +44,26 @@ defmodule Faktory do
   """
   @spec push(atom | binary, Keyword.t, [term]) :: jid
   def push(module, options, args) do
+    import Faktory.Utils, only: [new_jid: 0]
+    
     jobtype = Utils.normalize_jobtype(module)
     job = options
-      |> Keyword.merge(jobtype: jobtype, args: args)
+      |> Keyword.merge(jid: new_jid(), jobtype: jobtype, args: args)
       |> Utils.stringify_keys
+
+    traverse_middleware(job, client_config_module.all.middleware)
+  end
+
+  defp traverse_middleware(job, []) do
+    do_push(job)
+    job
+  end
+
+  defp traverse_middleware(job, [middleware | chain]) do
+    middleware.call(job, chain, &traverse_middleware/2)
+  end
+
+  defp do_push(job) do
     with_conn(&Protocol.push(&1, job))
   end
 

@@ -1,6 +1,6 @@
 defmodule Faktory.Utils do
   @moduledoc false
-  
+
   def normalize_jobtype(string) when is_binary(string) do
     String.replace_prefix(string, "Elixir.", "")
   end
@@ -18,6 +18,10 @@ defmodule Faktory.Utils do
 
   def new_wid do
     :crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)
+  end
+
+  def new_jid do
+    :crypto.strong_rand_bytes(12) |> Base.encode16(case: :lower)
   end
 
   def stringify(thing) do
