@@ -20,7 +20,7 @@ defmodule Faktory.Configuration do
     end
 
     defmodule WorkerConfig do
-      use Faktory.Configuration, :client
+      use Faktory.Configuration, :worker
 
       host "localhost"
       port 7419
