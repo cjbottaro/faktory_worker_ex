@@ -12,7 +12,7 @@ defmodule Mix.Tasks.Faktory do
   """
 
   use Mix.Task
-  require Logger
+  alias Faktory.Logger
 
   @shortdoc "Start Faktory worker"
 

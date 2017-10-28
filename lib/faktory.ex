@@ -89,6 +89,21 @@ defmodule Faktory do
     with_conn(&Protocol.flush(&1))
   end
 
+  @doc """
+  Return the log level.
+
+  The log level can be set to anything greater than or equal to Logger's level.
+
+  ```elixir
+  use Mix.Config
+  config faktory_worker_ex, log_level: :info
+  ```
+  """
+  @spec log_level :: atom
+  def log_level do
+    get_env(:log_level) || Application.get_env(:logger, :level)
+  end
+
   @doc false
   def get_env(key) do
      Application.get_env(@app_name, key)

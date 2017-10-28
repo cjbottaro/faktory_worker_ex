@@ -1,7 +1,7 @@
 defmodule Faktory.Connection do
   @moduledoc false
   use Connection
-  require Logger
+  alias Faktory.Logger
 
   @default_timeout 4000
 

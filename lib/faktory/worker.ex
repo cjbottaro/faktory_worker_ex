@@ -1,7 +1,7 @@
 defmodule Faktory.Worker do
   @moduledoc false
   use GenServer
-  require Logger
+  alias Faktory.Logger
 
   def start_link(manager, middleware) do
     GenServer.start_link(__MODULE__, {manager, middleware})

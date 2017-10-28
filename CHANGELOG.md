@@ -2,6 +2,7 @@
 
 0.3.0
 -----------
+* Separately configurable logger.
 * Connection pooling for workers.
 * Configuration is now a behaviour.
 
