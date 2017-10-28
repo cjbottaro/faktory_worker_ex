@@ -4,13 +4,9 @@ Elixir worker for Faktory ([blog](http://www.mikeperham.com/2017/10/24/introduci
 
 ## Installation
 
-```elixir
-def deps do
-  [
-    {:faktory_worker_ex, "~> 0.1.0"}
-  ]
-end
-```
+[faktory_worker_ex](https://hex.pm/packages/faktory_worker_ex) is available on
+[hex.pm](https://hex.pm).
+
 
 ## Configuration
 
@@ -53,7 +49,8 @@ config :faktory_worker_ex,
   worker_config: MyWorkerConfig
 ```
 
-Runtime configuration will be covered in the hexdocs.
+Runtime configuration is be covered in the
+[hexdocs](https://hexdocs.pm/faktory_worker_ex/Faktory.Configuration.html#module-runtime-configuration).
 
 ## Define a job module
 

@@ -34,7 +34,7 @@ defmodule Faktory.Configuration do
 
   ### Runtime configuration
 
-  You can set/update any configuration at runtime by defining a method.
+  You can set/update any configuration at runtime by defining a function.
 
   ```elixir
   defmodule ClientConfig do
