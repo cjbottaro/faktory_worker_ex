@@ -8,9 +8,7 @@ defmodule BasicTest do
   test "enqueing and processing a job" do
     AddWorker.perform_async([PidMap.register, 1, 2])
 
-    receive do
-      {:add_result, n} -> assert n == 3
-    end
+    assert_receive {:add_result, 3}
   end
 
   test "client middleware" do
@@ -19,9 +17,7 @@ defmodule BasicTest do
       [PidMap.register, 1, 2]
     )
 
-    receive do
-      {:add_result, n} -> assert n == 5
-    end
+    assert_receive {:add_result, 5}
   end
 
   test "worker middleware" do
@@ -30,13 +26,8 @@ defmodule BasicTest do
 
     AddWorker.perform_async([pid_key, 1, 2])
 
-    receive do
-      :ping -> assert(true)
-    end
-
-    receive do
-      {:add_result, n} -> assert n == 3
-    end
+    assert_receive :ping
+    assert_receive {:add_result, 3}
   end
 
 end
