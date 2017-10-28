@@ -4,7 +4,7 @@ defmodule Faktory.Mixfile do
   def project do
     [
       app: :faktory_worker_ex,
-      version: "0.2.1",
+      version: "0.3.0",
       elixir: "~> 1.5",
       start_permanent: Mix.env == :prod,
       deps: deps(),
