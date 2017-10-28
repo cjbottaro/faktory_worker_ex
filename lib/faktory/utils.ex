@@ -1,11 +1,11 @@
 defmodule Faktory.Utils do
   @moduledoc false
 
-  def normalize_jobtype(string) when is_binary(string) do
+  def module_name(string) when is_binary(string) do
     String.replace_prefix(string, "Elixir.", "")
   end
 
-  def normalize_jobtype(module) when is_atom(module) do
+  def module_name(module) when is_atom(module) do
     module |> Module.split |> Enum.join(".")
   end
 

@@ -32,9 +32,7 @@ defmodule Faktory.Worker do
   end
 
   defp handle_error(error, manager) do
-    errtype = error.__struct__
-      |> Module.split # Gets rid of the Elixir. prefix.
-      |> Enum.join(".")
+    errtype = Utils.module_name(error.__struct__)
     message = Exception.message(error)
     trace = Exception.format_stacktrace(System.stacktrace)
     error = {errtype, message, trace}

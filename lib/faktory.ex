@@ -46,7 +46,7 @@ defmodule Faktory do
   def push(module, options, args) do
     import Faktory.Utils, only: [new_jid: 0]
 
-    jobtype = Utils.normalize_jobtype(module)
+    jobtype = Utils.module_name(module)
     job = options
       |> Keyword.merge(jid: new_jid(), jobtype: jobtype, args: args)
       |> Utils.stringify_keys
