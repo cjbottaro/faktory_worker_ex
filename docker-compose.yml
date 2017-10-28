@@ -1,0 +1,10 @@
+version: "3"
+
+services:
+
+  test:
+    image: contribsys/faktory:0.5.0
+    command: -b :7419 -no-tls -l debug
+    ports:
+      - "7421:7419"
+      - "7422:7420"
