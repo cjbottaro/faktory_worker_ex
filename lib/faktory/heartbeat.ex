@@ -1,8 +1,7 @@
 defmodule Faktory.Heartbeat do
   @moduledoc false
   use GenServer
-  require Logger
-  alias Faktory.Protocol
+  alias Faktory.{Logger, Protocol}
   import Faktory.Utils, only: [stringify: 1]
 
   def start_link(wid) do

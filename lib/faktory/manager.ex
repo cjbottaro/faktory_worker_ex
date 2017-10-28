@@ -2,9 +2,7 @@ defmodule Faktory.Manager do
   @moduledoc false
   use GenServer
 
-  require Logger
-
-  alias Faktory.{Protocol, Worker}
+  alias Faktory.{Logger, Protocol, Worker}
   import Faktory.Utils, only: [now_in_ms: 0]
 
   def start_link(config) do
