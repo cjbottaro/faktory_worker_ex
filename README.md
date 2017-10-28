@@ -32,6 +32,7 @@ defmodule MyWorkerConfig do
   host "localhost"
   port 7419
   concurrency 20
+  pool 10
   queues ["default"]
 end
 ```
