@@ -63,8 +63,34 @@ defmodule Faktory.Configuration do
   having an active worker configuration!
   """
 
+  @doc ~S"""
+  Runtime configuration.
+
+  Define this callback to set configuration at runtime.
+
+  `config` is the existing config.
+
+  Return value is the updated config.
+
+  ## Example
+
+  Set host and port from environment vars.
+
+  ```elixir
+    def update(config) do
+      Keyword.merge(config,
+        host: System.get_env("FAKTORY_HOST"),
+        port: System.get_env("FAKTORY_PORT")
+      )
+    end
+  ```
+  """
+  @callback update(config :: Keyword.t) :: Keyword.t
+
   defmacro __using__(type) do
     quote do
+
+      @behaviour Faktory.Configuration
 
       import Faktory.Configuration, only: [
         host: 1, port: 1, pool: 1, concurrency: 1, queues: 1, middleware: 1
