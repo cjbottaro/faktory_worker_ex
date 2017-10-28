@@ -51,7 +51,9 @@ defmodule Faktory do
       |> Keyword.merge(jid: new_jid(), jobtype: jobtype, args: args)
       |> Utils.stringify_keys
 
-    traverse_middleware(job, client_config_module().all.middleware)
+    middleware = options[:middleware] ++ client_config_module().all.middleware
+
+    traverse_middleware(job, middleware)
   end
 
   defp traverse_middleware(job, []) do

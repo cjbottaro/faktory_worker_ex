@@ -58,7 +58,7 @@ defmodule Faktory.Job do
   defmacro __using__(_options) do
     quote do
       import Faktory.Job, only: [faktory_options: 1]
-      @faktory_options [queue: "default", retries: 25, backtrace: 0]
+      @faktory_options [queue: "default", retries: 25, backtrace: 0, middleware: []]
       @before_compile Faktory.Job
 
       def perform_async(args) do

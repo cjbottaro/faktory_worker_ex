@@ -16,4 +16,8 @@ defmodule Stack do
     Agent.get(__MODULE__, & &1)
   end
 
+  def clear do
+    Agent.update(__MODULE__, fn _ -> [] end)
+  end
+
 end
