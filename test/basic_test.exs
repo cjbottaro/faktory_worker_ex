@@ -9,10 +9,8 @@ defmodule BasicTest do
     AddWorker.perform_async([PidMap.register, 1, 2])
 
     receive do
-      :done -> nil
+      {:add_result, n} -> assert n == 3
     end
-
-    assert Stack.items == [3]
   end
 
   test "client middleware" do
@@ -22,10 +20,8 @@ defmodule BasicTest do
     )
 
     receive do
-      :done -> nil
+      {:add_result, n} -> assert n == 5
     end
-
-    assert Stack.items == [5]
   end
 
 end

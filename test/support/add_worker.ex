@@ -2,7 +2,6 @@ defmodule AddWorker do
   use Faktory.Job
 
   def perform(pid, x, y) do
-    Stack.push(x+y)
-    PidMap.get(pid) |> send(:done)
+    PidMap.get(pid) |> send({:add_result, x+y})
   end
 end
