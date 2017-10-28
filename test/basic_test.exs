@@ -24,4 +24,19 @@ defmodule BasicTest do
     end
   end
 
+  test "worker middleware" do
+    pid_key = PidMap.register
+    Stack.push({:ping_me, pid_key})
+
+    AddWorker.perform_async([pid_key, 1, 2])
+
+    receive do
+      :ping -> assert(true)
+    end
+
+    receive do
+      {:add_result, n} -> assert n == 3
+    end
+  end
+
 end

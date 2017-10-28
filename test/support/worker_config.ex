@@ -3,4 +3,5 @@ defmodule WorkerConfig do
 
   port 7421
   pool 5
+  middleware [Pinger]
 end
