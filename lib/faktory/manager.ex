@@ -4,7 +4,7 @@ defmodule Faktory.Manager do
 
   require Logger
 
-  alias Faktory.{Connection, Protocol, Worker}
+  alias Faktory.{Protocol, Worker}
   import Faktory.Utils, only: [now_in_ms: 0]
 
   def start_link(config) do
@@ -15,12 +15,8 @@ defmodule Faktory.Manager do
     # Queue up our mailbox.
     GenServer.cast(self(), :next)
 
-    # Make a connection to Faktory server.
-    {:ok, conn} = Connection.start_link(config)
-
     # Get our state in order.
     state = Map.merge(config, %{
-      conn: conn,
       job: nil,
       worker_pid: nil,
       error: nil,
@@ -60,8 +56,8 @@ defmodule Faktory.Manager do
   end
 
   # Either update state.job to be a map, or nil if no job was available.
-  def fetch(%{conn: conn, queues: queues} = state) do
-    %{state | job: Protocol.fetch(conn, queues)}
+  def fetch(%{queues: queues} = state) do
+    %{state | job: with_conn(&Protocol.fetch(&1, queues))}
   end
 
   # If no job was fetched, then start the main loop over again.
@@ -87,23 +83,23 @@ defmodule Faktory.Manager do
     %{state | job: nil, worker_pid: nil, error: nil, start_time: nil}
   end
 
-  defp report_ack(%{conn: conn, job: job, start_time: start_time}) do
+  defp report_ack(%{job: job, start_time: start_time}) do
     jid = job["jid"]
 
     Logger.info("#{inspect(self())} jid-#{jid} succeeded in #{elapsed(start_time)}s")
 
-    {:ok, _} = Protocol.ack(conn, jid)
+    {:ok, _} = with_conn(&Protocol.ack(&1, jid))
     Logger.debug("ack'ed #{jid}")
   end
 
-  defp report_fail(%{conn: conn, job: job, error: error, start_time: start_time}) do
+  defp report_fail(%{job: job, error: error, start_time: start_time}) do
     jid = job["jid"]
 
     Logger.info("#{inspect(self())} jid-#{jid} failed in #{elapsed(start_time)}s")
 
     {errtype, message, trace} = error
     trace = String.split(trace, "\n")
-    {:ok, _} = Protocol.fail(conn, jid, errtype, message, trace)
+    {:ok, _} = with_conn(&Protocol.fail(&1, jid, errtype, message, trace))
     Logger.debug("failed #{jid}")
   end
 
@@ -111,8 +107,12 @@ defmodule Faktory.Manager do
     "(#{errtype}) #{message}\n#{trace}"
   end
 
-  def elapsed(t) do
+  defp elapsed(t) do
     ((now_in_ms() - t) / 1000) |> Float.round(3)
+  end
+
+  defp with_conn(f) do
+    :poolboy.transaction(Faktory.worker_config_module, f)
   end
 
 end

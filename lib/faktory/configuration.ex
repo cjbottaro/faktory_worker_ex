@@ -25,6 +25,7 @@ defmodule Faktory.Configuration do
       host "localhost"
       port 7419
       concurrency 20
+      pool 10
       queues ["default"]
     end
   ```
@@ -105,7 +106,7 @@ defmodule Faktory.Configuration do
         :client ->
           @config merge(@config, pool: 10)
         :worker ->
-          @config merge(@config, concurrency: 20, queues: ["default"])
+          @config merge(@config, pool: 10, concurrency: 20, queues: ["default"])
       end
 
       def update(config), do: config
@@ -155,7 +156,7 @@ defmodule Faktory.Configuration do
   @doc """
   Set the connection pool size.
 
-  Valid for only client configuration. Default `10`
+  Valid for both client and worker configuration. Default `10`
   """
   @spec pool(integer) :: Keyword.t
   defmacro pool(pool) do

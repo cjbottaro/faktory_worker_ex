@@ -2,6 +2,7 @@
 
 0.3.0
 -----------
+* Connection pooling for workers.
 * Configuration is now a behaviour.
 
 0.2.1
