@@ -1,4 +1,5 @@
 defmodule Faktory.Logger do
+  @moduledoc false
   require Logger
 
   defmacro __using__(_) do

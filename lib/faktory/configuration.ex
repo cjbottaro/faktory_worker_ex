@@ -106,10 +106,12 @@ defmodule Faktory.Configuration do
         :client ->
           @config merge(@config, pool: 10)
         :worker ->
-          @config merge(@config, pool: 10, concurrency: 20, queues: ["default"])
+          @config merge(@config, pool: nil, concurrency: 20, queues: ["default"])
       end
 
+      def config_type, do: @config_type
       def update(config), do: config
+
       defoverridable [update: 1]
 
       @before_compile Faktory.Configuration
@@ -120,18 +122,25 @@ defmodule Faktory.Configuration do
     quote do
 
       def all do
-        import Faktory.Utils, only: [new_wid: 0]
-        alias Faktory.Configuration
+        alias Faktory.{Configuration, Utils}
+        import Configuration, only: [worker_special: 2]
 
         case :ets.lookup(Configuration, __MODULE__) do
           [{__MODULE__, config} | []] -> config
           _ ->
             config = @config
+              # Let user do runtime config.
               |> update
-              |> Keyword.put_new(:wid, new_wid())
+              # Always put these in.
+              |> Keyword.put(:wid, Utils.new_wid)
               |> Keyword.put(:config_module, __MODULE__)
-              |> Enum.map(fn {k, v} -> {k |> to_string |> String.to_atom, v} end)
-              |> Map.new
+              # If we're a worker config, do special stuff
+              |> worker_special(config_type())
+              # Turn it into a map with atom keys.
+              |> Utils.atomify_keys
+              |> IO.inspect
+
+            # Cache and return it.
             :ets.insert(Configuration, {__MODULE__, config})
             config
         end
@@ -211,5 +220,24 @@ defmodule Faktory.Configuration do
       @config Keyword.merge(@config, middleware: unquote(chain))
     end
   end
+
+  @doc false
+  # Helper function to add CLI options to config if is worker config.
+  def worker_special(config, :client), do: config
+  def worker_special(config, :worker) do
+    alias Faktory.Utils
+    cli_options = Faktory.get_env(:cli_options)
+    queues = cli_options[:queues] && (
+      cli_options[:queues] |> String.split(",")
+    )
+    config
+      # CLI overrides
+      |> Utils.put_unless_nil(:concurrency, cli_options[:concurrency])
+      |> Utils.put_unless_nil(:queues, queues)
+      |> Utils.put_unless_nil(:pool, cli_options[:pool])
+      # Default pool to concurrency
+      |> Utils.default_from_key(:pool, :concurrency)
+  end
+
 
 end

@@ -2,13 +2,15 @@ defmodule Mix.Tasks.Faktory do
   @moduledoc """
   Use this to start up the worker and start shreddin through your work!
 
-  `mix faktory`
+  ```
+  mix faktory
+  ```
 
-  Currently it doen not take any arguments; all configuation is done through
-  the configuation modules. In the future, I'd like to add command line args
-  that take precedence over the config modules. At least
-    * `--concurrency`
-    * `--queues`
+  Run `mix factory -h` for usage information.
+
+  Command line arguments will override configuration defined in modules.
+
+  Command line arguments only affect worker configuration (not client configuration).
   """
 
   use Mix.Task
@@ -18,15 +20,38 @@ defmodule Mix.Tasks.Faktory do
 
   @doc false
   def run(args) do
-    IO.inspect args
+    OptionParser.parse(args,
+      strict: [concurrency: :integer, queues: :string, pool: :integer],
+      aliases: [c: :concurrency, q: :queues, p: :pool]
+    ) |> case do
+      {options, [], []} -> start(options)
+      _ ->
+        print_usage()
+        exit(:normal)
+    end
+  end
 
+  defp start(options) do
     # Signify that we want to start the workers.
     Faktory.put_env(:start_workers, true)
+
+    # Store our cli options.
+    Faktory.put_env(:cli_options, options)
 
     # Easy enough.
     Mix.Task.run "app.start"
 
     shh_just_go_to_sleep()
+  end
+
+  defp print_usage do
+    IO.puts """
+    mix faktory [options]
+
+    -c, --concurrency  Number of worker processes
+    -q, --queues       Comma seperated list of queues
+    -p, --pool         Connection pool size. Default: <concurrency>
+    """
   end
 
   defp shh_just_go_to_sleep do
