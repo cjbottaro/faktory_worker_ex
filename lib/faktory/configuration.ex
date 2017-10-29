@@ -118,14 +118,25 @@ defmodule Faktory.Configuration do
 
   defmacro __before_compile__(_env) do
     quote do
+
       def all do
         import Faktory.Utils, only: [new_wid: 0]
-        config = @config
-          |> update
-          |> Keyword.put_new(:wid, new_wid())
-          |> Enum.map(fn {k, v} -> {k |> to_string |> String.to_atom, v} end)
-          |> Map.new
+        alias Faktory.Configuration
+
+        case :ets.lookup(Configuration, __MODULE__) do
+          [{__MODULE__, config} | []] -> config
+          _ ->
+            config = @config
+              |> update
+              |> Keyword.put_new(:wid, new_wid())
+              |> Keyword.put(:config_module, __MODULE__)
+              |> Enum.map(fn {k, v} -> {k |> to_string |> String.to_atom, v} end)
+              |> Map.new
+            :ets.insert(Configuration, {__MODULE__, config})
+            config
+        end
       end
+
     end
   end
 

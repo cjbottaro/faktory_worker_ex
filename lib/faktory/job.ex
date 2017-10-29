@@ -62,17 +62,14 @@ defmodule Faktory.Job do
       @before_compile Faktory.Job
 
       def perform_async(args) do
-        perform_async(faktory_options(), args)
+        perform_async([], args)
       end
 
       def perform_async(options, args) do
-        Faktory.push(__MODULE__, options, args)
+        Faktory.push(__MODULE__, args, options)
       end
 
-      def set(options) do
-        Keyword.merge(faktory_options(), options)
-      end
-
+      def set(options), do: options
       def set(options, new_options) do
         Keyword.merge(options, new_options)
       end

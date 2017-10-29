@@ -2,12 +2,11 @@ defmodule Faktory.Supervisor.Workers do
   @moduledoc false
   use Supervisor
 
-  def start_link(_arg \\ nil) do
-    Supervisor.start_link(__MODULE__, nil, name: __MODULE__)
+  def start_link(config_module) do
+    Supervisor.start_link(__MODULE__, config_module, name: {:global, {__MODULE__, config_module}})
   end
 
-  def init(nil) do
-    config_module = Faktory.worker_config_module
+  def init(config_module) do
     config = config_module.all
 
     # Manager processes
@@ -21,7 +20,7 @@ defmodule Faktory.Supervisor.Workers do
     # Add poolboy process and heartbeat process.
     children = [
       pool_spec(config_module, config),
-      {Faktory.Heartbeat, config.wid}
+      {Faktory.Heartbeat, config}
       | children
     ]
 
@@ -33,7 +32,7 @@ defmodule Faktory.Supervisor.Workers do
       name: {:local, config_module},
       worker_module: Faktory.Connection,
       size: config.pool,
-      max_overflow: 2
+      max_overflow: 0
     ]
     :poolboy.child_spec(config_module, pool_options, config)
   end

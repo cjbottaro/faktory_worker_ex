@@ -13,7 +13,7 @@ defmodule Faktory do
   # use what's in mix.exs. That would be nice.
   @app_name :faktory_worker_ex
 
-  alias Faktory.{Protocol, Utils}
+  alias Faktory.{Logger, Protocol, Utils}
 
   @doc false
   def start_workers? do
@@ -43,17 +43,31 @@ defmodule Faktory do
   ```
   """
   @spec push(atom | binary, Keyword.t, [term]) :: jid
-  def push(module, options, args) do
+  def push(module, args, options \\ []) do
     import Faktory.Utils, only: [new_jid: 0]
+
+    module = Module.safe_concat([module])
+    options = Keyword.merge(module.faktory_options, options)
 
     jobtype = Utils.module_name(module)
     job = options
       |> Keyword.merge(jid: new_jid(), jobtype: jobtype, args: args)
       |> Utils.stringify_keys
 
-    middleware = options[:middleware] ++ client_config_module().all.middleware
+    # This is weird, middleware is configured in the client config module,
+    # but we allow overriding in faktory_options and thus push options.
+    middleware = case options[:middleware] do
+      nil -> client_config_module().all.middleware
+      [] -> client_config_module().all.middleware
+      middleware -> middleware
+    end
 
     traverse_middleware(job, middleware)
+
+    %{ "jid" => jid, "args" => args } = job
+    Logger.debug "Q #{inspect self()} jid-#{jid} (#{jobtype}) #{inspect(args)}"
+
+    job
   end
 
   defp traverse_middleware(job, []) do

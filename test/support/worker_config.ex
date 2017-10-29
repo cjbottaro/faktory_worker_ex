@@ -2,6 +2,6 @@ defmodule WorkerConfig do
   use Faktory.Configuration, :worker
 
   port 7421
-  pool 5
-  middleware [Pinger]
+  concurrency 2
+  pool 2
 end

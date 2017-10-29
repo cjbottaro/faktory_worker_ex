@@ -55,7 +55,7 @@ defmodule Faktory.Manager do
 
   # Either update state.job to be a map, or nil if no job was available.
   def fetch(%{queues: queues} = state) do
-    %{state | job: with_conn(&Protocol.fetch(&1, queues))}
+    %{state | job: with_conn(state, &Protocol.fetch(&1, queues))}
   end
 
   # If no job was fetched, then start the main loop over again.
@@ -70,7 +70,7 @@ defmodule Faktory.Manager do
     GenServer.cast(worker_pid, {:run, job})
 
     %{"jid" => jid, "jobtype" => jobtype, "args" => args} = job
-    Logger.info("#{inspect(self())} jid-#{jid} started (#{jobtype}) #{inspect(args)}")
+    Logger.info("S #{inspect(self())} jid-#{jid} (#{jobtype}) #{inspect(args)}")
 
     %{state | worker_pid: worker_pid, start_time: now_in_ms()}
   end
@@ -81,24 +81,26 @@ defmodule Faktory.Manager do
     %{state | job: nil, worker_pid: nil, error: nil, start_time: nil}
   end
 
-  defp report_ack(%{job: job, start_time: start_time}) do
+  defp report_ack(%{job: job, start_time: start_time} = state) do
     jid = job["jid"]
+    jobtype = job["jobtype"]
 
-    Logger.info("#{inspect(self())} jid-#{jid} succeeded in #{elapsed(start_time)}s")
+    Logger.info("✓ #{inspect(self())} jid-#{jid} (#{jobtype}) #{elapsed(start_time)}s")
 
-    {:ok, _} = with_conn(&Protocol.ack(&1, jid))
+    {:ok, _} = with_conn(state, &Protocol.ack(&1, jid))
     Logger.debug("ack'ed #{jid}")
   end
 
-  defp report_fail(%{job: job, error: error, start_time: start_time}) do
+  defp report_fail(%{job: job, error: error, start_time: start_time} = state) do
     jid = job["jid"]
+    jobtype = job["jobtype"]
 
-    Logger.info("#{inspect(self())} jid-#{jid} failed in #{elapsed(start_time)}s")
+    Logger.info("✘ #{inspect(self())} jid-#{jid} (#{jobtype}) #{elapsed(start_time)}s")
 
     {errtype, message, trace} = error
     trace = String.split(trace, "\n")
-    {:ok, _} = with_conn(&Protocol.fail(&1, jid, errtype, message, trace))
-    Logger.debug("failed #{jid}")
+    {:ok, _} = with_conn(state, &Protocol.fail(&1, jid, errtype, message, trace))
+    Logger.debug("fail'ed #{jid}")
   end
 
   defp format_error({errtype, message, trace}) do
@@ -109,8 +111,8 @@ defmodule Faktory.Manager do
     ((now_in_ms() - t) / 1000) |> Float.round(3)
   end
 
-  defp with_conn(f) do
-    :poolboy.transaction(Faktory.worker_config_module, f)
+  defp with_conn(%{config_module: pool}, f) do
+    :poolboy.transaction(pool, f)
   end
 
 end

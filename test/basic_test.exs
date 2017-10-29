@@ -21,13 +21,12 @@ defmodule BasicTest do
   end
 
   test "worker middleware" do
-    pid_key = PidMap.register
-    Stack.push({:ping_me, pid_key})
+    AddWorker.perform_async(
+      [queue: "middleware"],
+      [PidMap.register, 1, 2]
+    )
 
-    AddWorker.perform_async([pid_key, 1, 2])
-
-    assert_receive :ping
-    assert_receive {:add_result, 3}
+    assert_receive {:add_result, 5}
   end
 
 end

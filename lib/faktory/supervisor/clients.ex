@@ -2,16 +2,12 @@ defmodule Faktory.Supervisor.Clients do
   @moduledoc false
   use Supervisor
 
-  def start_link(_arg) do
-    Supervisor.start_link(__MODULE__, nil, name: __MODULE__)
+  def start_link(config_module) do
+    Supervisor.start_link(__MODULE__, config_module, name: __MODULE__)
   end
 
-  def init(nil) do
-    Supervisor.init(children(), strategy: :one_for_one)
-  end
-
-  def children do
-    children(Faktory.client_config_module)
+  def init(config_module) do
+    Supervisor.init(children(config_module), strategy: :one_for_one)
   end
 
   def children(nil), do: []
