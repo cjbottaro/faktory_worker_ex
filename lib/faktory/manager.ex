@@ -112,7 +112,13 @@ defmodule Faktory.Manager do
   end
 
   defp with_conn(%{config_module: pool}, f) do
-    :poolboy.transaction(pool, f)
+    try do
+      :poolboy.transaction(pool, f)
+    catch
+      :exit, {:timeout, _} ->
+        Logger.warn("connection pool timeout")
+        with_conn(%{config_module: pool}, f)
+    end
   end
 
 end
