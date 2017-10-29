@@ -1,8 +1,8 @@
-defmodule Faktory.Manager do
+defmodule Faktory.Worker do
   @moduledoc false
   use GenServer
 
-  alias Faktory.{Logger, Protocol, Worker}
+  alias Faktory.{Logger, Protocol, Executor}
   import Faktory.Utils, only: [now_in_ms: 0]
 
   def start_link(config) do
@@ -65,7 +65,7 @@ defmodule Faktory.Manager do
 
   # If we have a job, then run it in a separate, monitored process and just wait.
   def execute(%{job: job} = state) do
-    {:ok, worker_pid} = Worker.start_link(self(), state.middleware)
+    {:ok, worker_pid} = Executor.start_link(self(), state.middleware)
     Process.monitor(worker_pid)
     GenServer.cast(worker_pid, {:run, job})
 

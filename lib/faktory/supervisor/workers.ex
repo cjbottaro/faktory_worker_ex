@@ -9,10 +9,10 @@ defmodule Faktory.Supervisor.Workers do
   def init(config_module) do
     config = config_module.all
 
-    # Manager processes
+    # Worker processes
     children = Enum.map 1..config.concurrency, fn i ->
       Supervisor.child_spec(
-        {Faktory.Manager, config},
+        {Faktory.Worker, config},
         id: {Faktory.Worker, config_module, i}
       )
     end

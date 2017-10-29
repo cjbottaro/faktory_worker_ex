@@ -1,21 +1,21 @@
-defmodule Faktory.Worker do
+defmodule Faktory.Executor do
   @moduledoc false
   use GenServer
   alias Faktory.{Logger, Utils}
 
-  def start_link(manager, middleware) do
-    GenServer.start_link(__MODULE__, {manager, middleware})
+  def start_link(worker, middleware) do
+    GenServer.start_link(__MODULE__, {worker, middleware})
   end
 
   def init(state) do
     {:ok, state}
   end
 
-  def handle_cast({:run, job}, {manager, middleware}) do
+  def handle_cast({:run, job}, {worker, middleware}) do
     try do
       perform(job, middleware) # Eventually calls dispatch.
     rescue
-      error -> handle_error(error, manager)
+      error -> handle_error(error, worker)
     end
 
     {:stop, :normal, nil}
@@ -31,12 +31,12 @@ defmodule Faktory.Worker do
     apply(module, :perform, job["args"])
   end
 
-  defp handle_error(error, manager) do
+  defp handle_error(error, worker) do
     errtype = Utils.module_name(error.__struct__)
     message = Exception.message(error)
     trace = Exception.format_stacktrace(System.stacktrace)
     error = {errtype, message, trace}
-    :ok = GenServer.call(manager, {:error_report, error})
+    :ok = GenServer.call(worker, {:error_report, error})
   end
 
   def traverse_middleware(job, []) do

@@ -6,10 +6,10 @@ This document describes some high level design concepts.
 
 `faktory_worker_ex` tries to be a proper OTP app with complete supervision trees.
 
-Workers (actually `Manager`s in code) are all watched by a supervisor as are any
-connection pools. Any given worker is linked to a connection and whatever process
-is actually executing the job. So if either die, so will the worker and the
-supervisor should bring it back up.
+Workers are all watched by a supervisor as are any connection pools. Any given
+worker is linked to a connection and whatever processis actually executing the
+job. So if either die, so will the worker and the supervisor should bring it
+back up.
 
 ## Connection
 
