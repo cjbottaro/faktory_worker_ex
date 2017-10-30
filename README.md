@@ -10,48 +10,12 @@ Elixir worker for Faktory ([blog](http://www.mikeperham.com/2017/10/24/introduci
 
 ## Configuration
 
-Configuration is done with modules and supports both compile-time and runtime
-configuration (at the same time).
+All configuration is optional with sane defaults and will connect to a
+Faktory server on `localhost:7419`.
 
-There are two types of configuration:
- * client (for pushing messages onto the queues)
- * worker (for reading/processing the queues)
-
-```elixir
-defmodule MyClientConfig do
-  use Faktory.Configuration, :client
-
-  host "localhost"
-  port 7419
-  pool 10
-end
-
-defmodule MyWorkerConfig do
-  use Faktory.Configuration, :worker
-
-  host "localhost"
-  port 7419
-  concurrency 20
-  pool 10
-  queues ["default"]
-end
-```
-
-All the configuration options are optional and default to the above.
-
-Now you need to make `faktory_worker_ex` aware of the configs. This is done
-in the normal Mix Config files (ex: `config/config.exs`).
-
-```elixir
-use Mix.Config
-
-config :faktory_worker_ex,
-  client_config: MyClientConfig,
-  worker_config: MyWorkerConfig
-```
-
-Runtime configuration is be covered in the
-[hexdocs](https://hexdocs.pm/faktory_worker_ex/Faktory.Configuration.html#module-runtime-configuration).
+See the
+[hexdocs](https://hexdocs.pm/faktory_worker_ex/Faktory.Configuration.html)
+for more on configuration.
 
 ## Define a job module
 

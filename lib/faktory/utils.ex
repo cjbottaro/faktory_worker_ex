@@ -18,10 +18,10 @@ defmodule Faktory.Utils do
   end
 
   def default_from_key(enum, dst, src) when is_map(enum) do
-    if enum[:dst] do
+    if Map.get(enum, dst) do
       enum
     else
-      Map.put(enum, dst, enum[src])
+      Map.put(enum, dst, Map.get(enum, src))
     end
   end
 

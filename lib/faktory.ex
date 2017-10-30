@@ -13,21 +13,11 @@ defmodule Faktory do
   # use what's in mix.exs. That would be nice.
   @app_name :faktory_worker_ex
 
-  alias Faktory.{Logger, Protocol, Utils}
+  alias Faktory.{Logger, Protocol, Utils, Configuration}
 
   @doc false
   def start_workers? do
     !!get_env(:start_workers)
-  end
-
-  @doc false
-  def worker_config_module do
-    get_env(:worker_config)
-  end
-
-  @doc false
-  def client_config_module do
-    get_env(:client_config)
   end
 
   @doc """
@@ -57,8 +47,8 @@ defmodule Faktory do
     # This is weird, middleware is configured in the client config module,
     # but we allow overriding in faktory_options and thus push options.
     middleware = case options[:middleware] do
-      nil -> client_config_module().all.middleware
-      [] -> client_config_module().all.middleware
+      nil -> Configuration.fetch(:client).middleware
+      [] -> Configuration.fetch(:client).middleware
       middleware -> middleware
     end
 
@@ -139,7 +129,8 @@ defmodule Faktory do
   """
   @spec with_conn((conn -> term)) :: term
   def with_conn(func) do
-    :poolboy.transaction(client_config_module(), func)
+    config = Configuration.fetch(:client)
+    :poolboy.transaction(config.name, func)
   end
 
 end

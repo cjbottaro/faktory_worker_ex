@@ -2,27 +2,25 @@ defmodule Faktory.Supervisor.Clients do
   @moduledoc false
   use Supervisor
 
-  def start_link(config_module) do
-    Supervisor.start_link(__MODULE__, config_module, name: __MODULE__)
+  def start_link(config) do
+    Supervisor.start_link(__MODULE__, config, name: __MODULE__)
   end
 
-  def init(config_module) do
-    Supervisor.init(children(config_module), strategy: :one_for_one)
+  def init(config) do
+    Supervisor.init(children(config), strategy: :one_for_one)
   end
 
   def children(nil), do: []
 
-  def children(config_module) do
-    config = config_module.all
-
+  def children(config) do
     pool_options = [
-      name: {:local, config_module},
+      name: {:local, config.name},
       worker_module: Faktory.Connection,
       size: config.pool,
       max_overflow: 2
     ]
 
-    [:poolboy.child_spec(config_module, pool_options, config)]
+    [:poolboy.child_spec(config.name, pool_options, config)]
   end
 
 end

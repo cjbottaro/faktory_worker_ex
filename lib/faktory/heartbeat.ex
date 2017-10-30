@@ -9,8 +9,8 @@ defmodule Faktory.Heartbeat do
   end
 
   def init(config) do
-    %{config_module: pool, wid: wid} = config
-    
+    %{name: pool, wid: wid} = config
+
     # Make sure we beat at least once before starting the workers.
     beat(pool, wid)
 

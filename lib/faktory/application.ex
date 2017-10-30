@@ -3,7 +3,7 @@ defmodule Faktory.Application do
   use Application
 
   def start(_type, _args) do
-    :ets.new(Faktory.Configuration, [:set, :public, :named_table])
+    Faktory.Configuration.init
     Faktory.Supervisor.start_link
   end
 end

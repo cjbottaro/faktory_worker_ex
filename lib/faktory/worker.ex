@@ -111,7 +111,7 @@ defmodule Faktory.Worker do
     ((now_in_ms() - t) / 1000) |> Float.round(3)
   end
 
-  defp with_conn(%{config_module: pool}, f) do
+  defp with_conn(%{name: pool}, f) do
     try do
       :poolboy.transaction(pool, f)
     catch

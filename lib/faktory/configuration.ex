@@ -1,243 +1,203 @@
 defmodule Faktory.Configuration do
   @moduledoc """
-  Configure clients (enqueuing) and workers (dequeing/processing).
+  Configuration options for clients and workers.
 
-  Client configuration is for enqueuing jobs. Worker configuration is for
-  dequeing and processing jobs. You may have an app that only needs one or the
-  other... or both!
+  Client config is used for _enqueuing_ jobs.
 
-  Configuration is done by defining modules then telling `faktory_worker_ex` about them.
+  Worker config is used for _dequeuing and processing_ jobs.
 
-  ### Compile time configuration
+  Your application may require one or the other... or both.
 
-  ```elixir
-    defmodule ClientConfig do
-      use Faktory.Configuration, :client
-
-      host "localhost"
-      port 7419
-      pool 10
-    end
-
-    defmodule WorkerConfig do
-      use Faktory.Configuration, :worker
-
-      host "localhost"
-      port 7419
-      concurrency 20
-      pool 10
-      queues ["default"]
-    end
-  ```
-
-  All the configuration options have sane defaults (pretty much exactly what
-  the example above shows).
-
-  ### Runtime configuration
-
-  You can set/update any configuration at runtime by defining a function.
-
-  ```elixir
-  defmodule ClientConfig do
-    use Faktory.Configuration, :client
-
-    def update(old_config) do
-      new_config = Keyword.put(old_config, :pool, old_config[:pool] + 1)
-      new_config
-    end
-  end
-  ```
-
-  ### Activating the configuration.
-
-  In your Mix Config files (`config/config.exs`)...
+  ### Defaults
 
   ```elixir
   use Mix.Config
 
   config :faktory_worker_ex,
-    client_config: ClientConfig,
-    worker_config: WorkerConfig
+    host: "localhost",
+    port: 7419,
+    client: [
+      pool: 10,
+    ],
+    worker: [
+      concurrency: 20,
+      queues: ["default"],
+    ]
   ```
 
-  Note that workers will only run via the mix task (`mix faktory`), despite
-  having an active worker configuration!
-  """
+  Notice that client/worker specific options will inherit from top level options
+  where applicable. In the above example, `client.host` will be `"localhost"`.
 
-  @doc ~S"""
-  Runtime configuration.
+  ### Options
 
-  Define this callback to set configuration at runtime.
+  * `host` - Faktory server host. Default `"localhost"`
+  * `port` - Faktory server port. Default `7419`
+  * `config_fn` - Callback function for runtime config. Default `nil`
 
-  `config` is the existing config.
+  ### Client Options
 
-  Return value is the updated config.
+    * `pool` - Client connection pool size. Default `10`
+    * `middleware` - Client middleware chain. Default `[]`
 
-  ## Example
+  ### Worker Options
 
-  Set host and port from environment vars.
+    * `pool` - Worker connection pool size. Default `${concurrency}`
+    * `middleware` - Worker middleware chain. Default `[]`
+    * `concurrency` - How many worker processes to start. Default `20`
+    * `queues` - List of queues to fetch from. Default `["default"]`
+
+  ### Runtime Configuration
+
+  You can specify a callback to do runtime configuration. For example, to read
+  host and port from environment variables.
 
   ```elixir
-    def update(config) do
-      Keyword.merge(config,
-        host: System.get_env("FAKTORY_HOST"),
-        port: System.get_env("FAKTORY_PORT")
-      )
+  config :faktory_worker_ex,
+    config_fn: &FaktoryConfig.call/1
+
+  defmodule FaktoryConfig do
+    def call(config) do
+      %{ config |
+         host: System.get_env("FAKTORY_HOST"),
+         port: System.get_env("FAKTORY_PORT") }
     end
+  end
+  ```
+
+  The function takes a config struct and returns a config struct.
+
+  ### Example
+
+  ```elixir
+  config :faktory_worker_ex,
+    host: "faktory.company.com",
+    client: [
+      pool: 5,
+      middleware: [Statsd]
+    ],
+    worker: [
+      concurrency: 10,
+      queues: ["priority01", "priority02", "priority03"]
+    ]
   ```
   """
-  @callback update(config :: Keyword.t) :: Keyword.t
 
-  defmacro __using__(type) do
-    quote do
+  alias Faktory.Utils
+  alias Faktory.Configuration.{Client, Worker}
 
-      @behaviour Faktory.Configuration
-
-      import Faktory.Configuration, only: [
-        host: 1, port: 1, pool: 1, concurrency: 1, queues: 1, middleware: 1
-      ]
-      import Keyword, only: [merge: 2]
-
-      # Common defaults
-      @config [host: "localhost", port: 7419, middleware: []]
-      @config_type unquote(type) # @type is special, can't use it.
-
-      case unquote(type) do
-        :client ->
-          @config merge(@config, pool: 10)
-        :worker ->
-          @config merge(@config, pool: nil, concurrency: 20, queues: ["default"])
-      end
-
-      def config_type, do: @config_type
-      def update(config), do: config
-
-      defoverridable [update: 1]
-
-      @before_compile Faktory.Configuration
-    end
+  def init do
+    :ets.new(__MODULE__, [:set, :public, :named_table])
+    init(:clients)
+    init(:workers)
   end
 
-  defmacro __before_compile__(_env) do
-    quote do
-
-      def all do
-        alias Faktory.{Configuration, Utils}
-        import Configuration, only: [worker_special: 2]
-
-        case :ets.lookup(Configuration, __MODULE__) do
-          [{__MODULE__, config} | []] -> config
-          _ ->
-            config = @config
-              # Let user do runtime config.
-              |> update
-              # Always put these in.
-              |> Keyword.put(:wid, Utils.new_wid)
-              |> Keyword.put(:config_module, __MODULE__)
-              # If we're a worker config, do special stuff
-              |> worker_special(config_type())
-              # Turn it into a map with atom keys.
-              |> Utils.atomify_keys
-              |> IO.inspect
-
-            # Cache and return it.
-            :ets.insert(Configuration, {__MODULE__, config})
-            config
-        end
-      end
-
+  def init(:clients) do
+    if get_env(:client) && get_env(:clients) do
+      raise "configuration cannot have both :client and :clients"
     end
+
+    raw_configs_for(:client)
+      |> Enum.each(fn {name, config} ->
+        config = resolve_config(Client, name, config)
+        :ets.insert(__MODULE__, {config.name, config})
+      end)
   end
 
-  @doc """
-  Set the host to connect to.
-
-  Valid for both client and worker configuration. Default `"localhost"`
-  """
-  @spec host(String.t) :: Keyword.t
-  defmacro host(host) do
-    quote do
-      @config Keyword.merge(@config, host: unquote(host))
+  def init(:workers) do
+    if get_env(:worker) && get_env(:workers) do
+      raise "configuration cannot have both :worker and :workers"
     end
+
+    raw_configs_for(:worker)
+      |> Enum.each(fn {name, config} ->
+        config = resolve_config(Worker, name, config)
+        :ets.insert(__MODULE__, {config.name, config})
+      end)
+  end
+
+  def resolve_config(type, name, config) do
+
+    # Pull over top level options.
+    config = config
+      |> put_from_env(:host, :host)
+      |> put_from_env(:port, :port)
+      |> put_from_env(:fn, :config_fn)
+      |> Keyword.put(:name, name)
+
+    # Convert to struct.
+    config = struct!(type, config)
+
+    # Runtime configuration callback.
+    config = case config.fn do
+      nil -> config
+      f -> f.(config)
+    end
+
+    # Add proper name and wid.
+    config = %{config | name: name(type, name), wid: Utils.new_wid()}
+
+    # Maybe default :pool to :concurrency.
+    if type == Worker do
+      Utils.default_from_key(config, :pool, :concurrency)
+    else
+      config
+    end
+
+  end
+
+  defp name(type, name) do
+    case type do
+      Client -> "client/#{name}"
+      Worker -> "worker/#{name}"
+      _ -> "#{type}/#{name}"
+    end |> String.to_atom
   end
 
   @doc """
-  Set the port to connect to.
+  Get client or worker config.
 
-  Valid for both client and worker configuration. Default `7419`
+  Resolves all the values from Mix Config, runs any runtime config callbacks,
+  and returns a struct representing the config.
   """
-  @spec port(integer) :: Keyword.t
-  defmacro port(port) do
-    quote do
-      @config Keyword.merge(@config, port: unquote(port))
-    end
-  end
-
-  @doc """
-  Set the connection pool size.
-
-  Valid for both client and worker configuration. Default `10`
-  """
-  @spec pool(integer) :: Keyword.t
-  defmacro pool(pool) do
-    quote do
-      @config Keyword.merge(@config, pool: unquote(pool))
-    end
-  end
-
-  @doc """
-  Set the max number of concurrent jobs that can be processed at a time.
-
-  Valid only for worker configuration. Default `20`
-  """
-  @spec concurrency(integer) :: Keyword.t
-  defmacro concurrency(concurrency) do
-    quote do
-      @config Keyword.merge(@config, concurrency: unquote(concurrency))
-    end
-  end
-
-  @doc """
-  Set the queues to fetch jobs from.
-
-  Valid only for worker configuration. Default `["default"]`
-  """
-  @spec queues([String.t]) :: Keyword.t
-  defmacro queues(queues) do
-    quote do
-      @config Keyword.merge(@config, queues: unquote(queues))
-    end
-  end
-
-  @doc """
-  Set the middleware chain to use.
-
-  Valid for both client and worker configurations. Default `[]`
-  """
-  @spec middleware([module]) :: Keyword.t
-  defmacro middleware(chain) do
-    quote do
-      @config Keyword.merge(@config, middleware: unquote(chain))
-    end
-  end
-
-  @doc false
-  # Helper function to add CLI options to config if is worker config.
-  def worker_special(config, :client), do: config
-  def worker_special(config, :worker) do
-    alias Faktory.Utils
-    cli_options = Faktory.get_env(:cli_options)
-    queues = cli_options[:queues] && (
-      cli_options[:queues] |> String.split(",")
-    )
+  @spec fetch(:client | :worker, atom) :: struct
+  def fetch(type, name \\ :default) do
+    name = name(type, name)
+    [{_name, config}] = :ets.lookup(__MODULE__, name)
     config
-      # CLI overrides
-      |> Utils.put_unless_nil(:concurrency, cli_options[:concurrency])
-      |> Utils.put_unless_nil(:queues, queues)
-      |> Utils.put_unless_nil(:pool, cli_options[:pool])
-      # Default pool to concurrency
-      |> Utils.default_from_key(:pool, :concurrency)
   end
 
+  def fetch_all do
+    # Jeez that's some clunky syntax, Erlang.
+    :ets.match(__MODULE__, {:"_", :"$1"}) |> List.flatten
+  end
+
+  def fetch_all(type) do
+    type = case type do
+      :client -> Client
+      :worker -> Worker
+      _ -> type
+    end
+
+    Enum.filter(fetch_all(), & &1.__struct__ == type)
+  end
+
+  defp get_env(key) do
+    Application.get_env(:faktory_worker_ex, key)
+  end
+
+  defp put_from_env(enum, dst, src) do
+    Utils.put_unless_nil(enum, dst, get_env(src))
+  end
+
+  def raw_configs_for(type) do
+    plural = "#{type}s" |> String.to_atom
+
+    case get_env(type) do
+      nil -> get_env(plural) || [{:default, []}]
+      config -> [{:default, config}]
+    end
+  end
+
+  def fetch_all(type)
 
 end

@@ -2,24 +2,24 @@ defmodule Faktory.Supervisor.Workers do
   @moduledoc false
   use Supervisor
 
-  def start_link(config_module) do
-    Supervisor.start_link(__MODULE__, config_module, name: {:global, {__MODULE__, config_module}})
+  def start_link(config) do
+    name = {:global, {__MODULE__, config.name}}
+    Supervisor.start_link(__MODULE__, config, name: name)
   end
 
-  def init(config_module) do
-    config = config_module.all
+  def init(config) do
 
     # Worker processes
     children = Enum.map 1..config.concurrency, fn i ->
       Supervisor.child_spec(
         {Faktory.Worker, config},
-        id: {Faktory.Worker, config_module, i}
+        id: {Faktory.Worker, config.name, i}
       )
     end
 
     # Add poolboy process and heartbeat process.
     children = [
-      pool_spec(config_module, config),
+      pool_spec(config),
       {Faktory.Heartbeat, config}
       | children
     ]
@@ -27,14 +27,14 @@ defmodule Faktory.Supervisor.Workers do
     Supervisor.init(children, strategy: :one_for_one)
   end
 
-  defp pool_spec(config_module, config) do
+  defp pool_spec(config) do
     pool_options = [
-      name: {:local, config_module},
+      name: {:local, config.name},
       worker_module: Faktory.Connection,
       size: config.pool,
       max_overflow: 0
     ]
-    :poolboy.child_spec(config_module, pool_options, config)
+    :poolboy.child_spec(config.name, pool_options, config)
   end
 
 end
