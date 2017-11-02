@@ -85,12 +85,14 @@ defmodule Faktory.Configuration do
   alias Faktory.Utils
   alias Faktory.Configuration.{Client, Worker}
 
+  @doc false
   def init do
     :ets.new(__MODULE__, [:set, :public, :named_table])
     init(:clients)
     init(:workers)
   end
 
+  @doc false
   def init(:clients) do
     if get_env(:client) && get_env(:clients) do
       raise "configuration cannot have both :client and :clients"
@@ -103,6 +105,7 @@ defmodule Faktory.Configuration do
       end)
   end
 
+  @doc false
   def init(:workers) do
     if get_env(:worker) && get_env(:workers) do
       raise "configuration cannot have both :worker and :workers"
@@ -115,6 +118,7 @@ defmodule Faktory.Configuration do
       end)
   end
 
+  @doc false
   def resolve_config(type, name, config) do
 
     # Pull over top level options.
@@ -166,11 +170,21 @@ defmodule Faktory.Configuration do
     config
   end
 
+  @doc """
+  Fetch all configuration.
+
+  Returns both client and worker configs.
+  """
+  @spec fetch_all :: [struct]
   def fetch_all do
     # Jeez that's some clunky syntax, Erlang.
     :ets.match(__MODULE__, {:"_", :"$1"}) |> List.flatten
   end
 
+  @doc """
+  Fetch client or worker configs.
+  """
+  @spec fetch_all(:client | :worker) :: [struct]
   def fetch_all(type) do
     type = case type do
       :client -> Client
@@ -189,7 +203,7 @@ defmodule Faktory.Configuration do
     Utils.put_unless_nil(enum, dst, get_env(src))
   end
 
-  def raw_configs_for(type) do
+  defp raw_configs_for(type) do
     plural = "#{type}s" |> String.to_atom
 
     case get_env(type) do
@@ -197,7 +211,5 @@ defmodule Faktory.Configuration do
       config -> [{:default, config}]
     end
   end
-
-  def fetch_all(type)
 
 end
