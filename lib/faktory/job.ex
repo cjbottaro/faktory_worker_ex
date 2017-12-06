@@ -33,7 +33,7 @@ defmodule Faktory.Job do
   defmodule MyFunkyJob do
     use Faktory.Job
 
-    faktory_options queue: "default", retries: 25, backtrace: 0
+    faktory_options queue: "default", retry: 25, backtrace: 0
 
     # ...
   end
@@ -58,7 +58,7 @@ defmodule Faktory.Job do
   defmacro __using__(_options) do
     quote do
       import Faktory.Job, only: [faktory_options: 1]
-      @faktory_options [queue: "default", retries: 25, backtrace: 0, middleware: []]
+      @faktory_options [queue: "default", retry: 25, backtrace: 0, middleware: []]
       @before_compile Faktory.Job
 
       def perform_async(args) do
@@ -90,7 +90,7 @@ defmodule Faktory.Job do
   ## Options
 
     * `:queue` - Name of queue. Default `"default"`
-    * `:retries` - How many times to retry. Default `25`
+    * `:retry` - How many times to retry. Default `25`
     * `:backtrace` - How many lines of backtrace to store if the job errors. Default `0`
   """
   @spec faktory_options(Keyword.t) :: nil
