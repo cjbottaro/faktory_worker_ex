@@ -29,7 +29,7 @@ defmodule Faktory do
   Ex:
   ```elixir
     push(MyFunWork, [queue: "somewhere"], [1, 2])
-    push("BoringWork", [retries: 0, backtrace: 10], [])
+    push("BoringWork", [retry: 0, backtrace: 10], [])
   ```
   """
   @spec push(atom | binary, Keyword.t, [term]) :: jid
