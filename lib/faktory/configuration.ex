@@ -236,7 +236,7 @@ defmodule Faktory.Configuration do
     end
   end
 
-  defp parse_config_value({:system, env_var, default}), do: System.get_env(env_var, default)
+  defp parse_config_value({:system, env_var, default}), do: System.get_env(env_var) || default
 
   defp parse_config_value({:system, env_var}), do: System.get_env(env_var)
 
