@@ -220,7 +220,7 @@ defmodule Faktory.Configuration do
 
   defp get_env(key) do
     Application.get_env(:faktory_worker_ex, key)
-    |> parse_config_value
+    |> Utils.parse_config_value
   end
 
   defp put_from_env(enum, dst, src) do
@@ -235,11 +235,4 @@ defmodule Faktory.Configuration do
       config -> [{:default, config}]
     end
   end
-
-  defp parse_config_value({:system, env_var, default}), do: System.get_env(env_var) || default
-
-  defp parse_config_value({:system, env_var}), do: System.get_env(env_var)
-
-  defp parse_config_value(value), do: value
-
 end
