@@ -113,6 +113,7 @@ defmodule Faktory do
   @doc false
   def get_env(key) do
      Application.get_env(@app_name, key)
+     |> Utils.parse_config_value
   end
 
   @doc false
