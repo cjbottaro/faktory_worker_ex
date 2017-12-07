@@ -68,4 +68,7 @@ defmodule Faktory.Utils do
     :os.system_time(:milli_seconds)
   end
 
+  def to_int(value) when is_binary(value), do: String.to_integer(value)
+
+  def to_int(value), do: value
 end
