@@ -46,6 +46,29 @@ defmodule Faktory.Configuration do
     * `concurrency` - How many worker processes to start. Default `20`
     * `queues` - List of queues to fetch from. Default `["default"]`
 
+  ### Environment variables
+
+  It is possible to use environment variables for the configuration with the
+  following format:
+
+  ```elixir
+  use Mix.Config
+
+  config :faktory_worker_ex,
+    host: {:system, "FAKTORY_HOST", "localhost"},
+    port: {:system, "FAKTORY_PORT", 7419},
+    client: [
+      pool: 10,
+    ],
+    worker: [
+      concurrency: 20,
+      queues: ["default"],
+    ]
+  ```
+
+  The format is {:system, ENV_VAR, DEFAULT}. The default can be skipped:
+  {:system, ENV_VAR}
+
   ### Runtime Configuration
 
   You can specify a callback to do runtime configuration. For example, to read
@@ -197,6 +220,7 @@ defmodule Faktory.Configuration do
 
   defp get_env(key) do
     Application.get_env(:faktory_worker_ex, key)
+    |> Utils.parse_config_value
   end
 
   defp put_from_env(enum, dst, src) do
@@ -211,5 +235,4 @@ defmodule Faktory.Configuration do
       config -> [{:default, config}]
     end
   end
-
 end

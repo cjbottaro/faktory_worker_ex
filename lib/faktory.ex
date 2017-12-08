@@ -29,7 +29,7 @@ defmodule Faktory do
   Ex:
   ```elixir
     push(MyFunWork, [queue: "somewhere"], [1, 2])
-    push("BoringWork", [retries: 0, backtrace: 10], [])
+    push("BoringWork", [retry: 0, backtrace: 10], [])
   ```
   """
   @spec push(atom | binary, Keyword.t, [term]) :: jid
@@ -113,6 +113,7 @@ defmodule Faktory do
   @doc false
   def get_env(key) do
      Application.get_env(@app_name, key)
+     |> Utils.parse_config_value
   end
 
   @doc false

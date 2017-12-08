@@ -10,6 +10,8 @@ defmodule Faktory.Worker do
   end
 
   def init(config) do
+    Process.flag(:trap_exit, true)
+
     # Queue up our mailbox.
     GenServer.cast(self(), :next)
 
@@ -50,6 +52,19 @@ defmodule Faktory.Worker do
       %{error: nil} -> report_ack(state)
       %{error: _error} -> report_fail(state)
     end
+    {:noreply, next(state)}
+  end
+
+  def handle_info({:EXIT, pid, :normal}, %{worker_pid: worker_pid} = state) do
+    {:noreply, state}
+  end
+
+  def handle_info({:EXIT, pid, {errtype, trace} = reason}, %{worker_pid: worker_pid} = state)
+  when pid == worker_pid do
+    Logger.debug("Worker exitted unexpectedly #{inspect(reason)}")
+
+    report_fail(%{state | error: {errtype, inspect(trace), ""}})
+
     {:noreply, next(state)}
   end
 

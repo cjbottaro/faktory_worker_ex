@@ -3,6 +3,8 @@ defmodule Faktory.Connection do
   use Connection
   alias Faktory.Logger
 
+  import Faktory.Utils, only: [to_int: 1]
+
   @default_timeout 4000
 
   def start_link(config) do
@@ -29,7 +31,7 @@ defmodule Faktory.Connection do
   def connect(:init, state) do
     %{host: host, port: port} = state
     host = String.to_charlist(host)
-    case :gen_tcp.connect(host, port, [:binary, active: false], @default_timeout) do
+    case :gen_tcp.connect(host, to_int(port), [:binary, active: false], @default_timeout) do
       {:ok, socket} ->
         handshake!(socket, state.wid)
         {:ok, %{state | socket: socket}}
@@ -137,5 +139,4 @@ defmodule Faktory.Connection do
     {:ok, hostname} = :inet.gethostname
     to_string(hostname)
   end
-
 end

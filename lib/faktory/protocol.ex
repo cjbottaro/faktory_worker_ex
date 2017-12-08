@@ -118,6 +118,8 @@ defmodule Faktory.Protocol do
     rx(conn, size)
   end
 
+  defp rx(conn, size) when size == -1, do: {:ok, nil}
+
   defp rx(conn, size) when size == 0 do
     case recv(conn, :line) do
       {:ok, _} -> {:ok, nil}
