@@ -8,7 +8,7 @@ defmodule Stack do
     Agent.update(__MODULE__, &[item | &1])
   end
 
-  def pop(item) do
+  def pop do
     Agent.get_and_update(__MODULE__, fn [item | list] -> {item, list} end)
   end
 
