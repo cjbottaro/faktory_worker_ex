@@ -32,6 +32,7 @@ defmodule Faktory.Configuration do
 
   * `host` - Faktory server host. Default `"localhost"`
   * `port` - Faktory server port. Default `7419`
+  * `password` - Faktory server password. Default `nil`
   * `config_fn` - Callback function for runtime config. Default `nil`
 
   ### Client Options
@@ -125,6 +126,7 @@ defmodule Faktory.Configuration do
     config = config
       |> put_from_env(:host, :host)
       |> put_from_env(:port, :port)
+      |> put_from_env(:password, :password)
       |> put_from_env(:fn, :config_fn)
       |> Keyword.put(:name, name)
 
