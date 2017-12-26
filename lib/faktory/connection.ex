@@ -31,7 +31,7 @@ defmodule Faktory.Connection do
     host = String.to_charlist(host)
     case :gen_tcp.connect(host, port, [:binary, active: false], @default_timeout) do
       {:ok, socket} ->
-        handshake!(socket, state.wid)
+        handshake!(socket, state.wid, state.password)
         {:ok, %{state | socket: socket}}
       {:error, error} ->
         Logger.warn("Connection failed to #{host}:#{port} (#{error})")
@@ -102,20 +102,38 @@ defmodule Faktory.Connection do
     end
   end
 
-  defp handshake!(socket, wid) do
+  defp handshake!(socket, wid, password) do
     :inet.setopts(socket, packet: :line)
-    {:ok, <<"+HI", _rest::binary>>} = :gen_tcp.recv(socket, 0)
+    {:ok, <<"+HI", rest::binary>>} = :gen_tcp.recv(socket, 0)
+
+    server_config = Poison.decode!(rest)
+    server_version = server_config["v"]
+
+    if server_version > 2 do
+      Logger.warn("Warning: Faktory server protocol #{server_version} in use, but this worker doesn't speak that version")
+    end
 
     payload = %{
       wid: wid,
       hostname: hostname(),
       pid: System.get_pid |> String.to_integer,
-      labels: ["elixir"]
-    } |> Poison.encode!
+      labels: ["elixir"],
+      v: 2,
+    }
+    |> Map.merge(password_opts(password, server_config))
+    |> Poison.encode!
 
     :ok = :gen_tcp.send(socket, "HELLO #{payload}\r\n")
     {:ok, "+OK\r\n"} = :gen_tcp.recv(socket, 0)
   end
+
+  defp password_opts(nil, %{"s" => _salt}), do: raise "This server requires a password, but a password hasn't been configured"
+
+  defp password_opts(password, %{"s" => salt, "i" => iterations}) do
+    %{pwdhash: Faktory.Utils.hash_password(iterations, password, salt)}
+  end
+
+  defp password_opts(_password, _server_config), do: %{}
 
   # If asking for a line, then go into line mode and get whole line.
   defp setup_size(socket, :line) do
