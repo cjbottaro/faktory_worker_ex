@@ -125,6 +125,7 @@ defmodule Faktory.Configuration do
     config = config
       |> put_from_env(:host, :host)
       |> put_from_env(:port, :port)
+      |> put_from_env(:use_tls, :use_tls)
       |> put_from_env(:fn, :config_fn)
       |> Keyword.put(:name, name)
 
