@@ -21,8 +21,8 @@ defmodule Mix.Tasks.Faktory do
   @doc false
   def run(args) do
     OptionParser.parse(args,
-      strict: [concurrency: :integer, queues: :string, pool: :integer],
-      aliases: [c: :concurrency, q: :queues, p: :pool]
+      strict: [concurrency: :integer, queues: :string, pool: :integer, use_tls: :boolean],
+      aliases: [c: :concurrency, q: :queues, p: :pool, t: :use_tls, tls: :use_tls]
     ) |> case do
       {options, [], []} -> start(options)
       _ ->
@@ -51,6 +51,7 @@ defmodule Mix.Tasks.Faktory do
     -c, --concurrency  Number of worker processes
     -q, --queues       Comma seperated list of queues
     -p, --pool         Connection pool size. Default: <concurrency>
+    -t, --tls          Enable TLS when connecting to Faktory server. Default: disable TLS
     """
   end
 
