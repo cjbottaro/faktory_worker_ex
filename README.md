@@ -63,7 +63,6 @@ You should be able to go to [http://localhost:7420](http://localhost:7420) and s
 
 ## What's missing?
 
-* Authentication
 * TLS
 * Responding to the terminate signal (from the Faktory server)
 * Tests
