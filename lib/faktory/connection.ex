@@ -31,11 +31,13 @@ defmodule Faktory.Connection do
     host = String.to_charlist(host)
     transport = if use_tls, do: :ssl, else: :gen_tcp
 
+    certs = :certifi.cacerts()
+
     base_opts = [:binary, active: false]
     tcp_opts = if use_tls do
       # Disable TLS verification in dev/test so that self-signed certs will work
       verify_opts = if Mix.env in [:dev, :test], do: [verify: :verify_none], else: [verify: :verify_peer]
-      base_opts ++ verify_opts ++ [versions: [:'tlsv1.2']]
+      base_opts ++ verify_opts ++ [versions: [:'tlsv1.2'], depth: 99, cacerts: certs]
     else
       base_opts
     end
