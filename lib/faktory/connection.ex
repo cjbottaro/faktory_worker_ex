@@ -22,17 +22,28 @@ defmodule Faktory.Connection do
   end
 
   def init(config) do
-    state = Map.put(config, :socket, nil)
+    state = config |> Map.put(:socket, nil) |> Map.put(:transport, nil)
     {:connect, :init, state}
   end
 
   def connect(:init, state) do
-    %{host: host, port: port} = state
+    %{host: host, port: port, use_tls: use_tls} = state
     host = String.to_charlist(host)
-    case :gen_tcp.connect(host, port, [:binary, active: false], @default_timeout) do
+    transport = if use_tls, do: :ssl, else: :gen_tcp
+
+    base_opts = [:binary, active: false]
+    tcp_opts = if use_tls do
+      # Disable TLS verification in dev/test so that self-signed certs will work
+      verify_opts = if Mix.env in [:dev, :test], do: [verify: :verify_none], else: [verify: :verify_peer]
+      base_opts ++ verify_opts ++ [versions: [:'tlsv1.2']]
+    else
+      base_opts
+    end
+
+    case transport.connect(host, port, tcp_opts, @default_timeout) do
       {:ok, socket} ->
-        handshake!(socket, state.wid)
-        {:ok, %{state | socket: socket}}
+        handshake!(transport, socket, state.wid)
+        {:ok, %{state | socket: socket, transport: transport}}
       {:error, error} ->
         Logger.warn("Connection failed to #{host}:#{port} (#{error})")
         {:backoff, 1000, state}
@@ -54,7 +65,7 @@ defmodule Faktory.Connection do
     %{socket: socket, host: host, port: port} = state
 
     # Close the damn thing.
-    :ok = :gen_tcp.close(socket)
+    :ok = state.transport.close(socket)
 
     case info do
       # Terminate normally.
@@ -82,16 +93,16 @@ defmodule Faktory.Connection do
   end
 
   def handle_call({:send, data}, _from, %{socket: socket} = state) do
-    case :gen_tcp.send(socket, data) do
+    case state.transport.send(socket, data) do
       :ok -> {:reply, :ok, state}
       {:error, _} = error -> {:disconnect, error, error, state}
     end
   end
 
-  def handle_call({:recv, size}, _, %{socket: socket} = state) do
-    size = setup_size(socket, size)
+  def handle_call({:recv, size}, _, %{socket: socket, transport: transport} = state) do
+    size = setup_size(transport, socket, size)
 
-    case :gen_tcp.recv(socket, size, @default_timeout) do
+    case state.transport.recv(socket, size, @default_timeout) do
       {:ok, data} ->
         data = cleanup_data(data, size)
         {:reply, {:ok, data}, state}
@@ -102,9 +113,9 @@ defmodule Faktory.Connection do
     end
   end
 
-  defp handshake!(socket, wid) do
-    :inet.setopts(socket, packet: :line)
-    {:ok, <<"+HI", _rest::binary>>} = :gen_tcp.recv(socket, 0)
+  defp handshake!(transport, socket, wid) do
+    setup_size(transport, socket, :line)
+    {:ok, <<"+HI", _rest::binary>>} = transport.recv(socket, 0)
 
     payload = %{
       wid: wid,
@@ -113,19 +124,19 @@ defmodule Faktory.Connection do
       labels: ["elixir"]
     } |> Poison.encode!
 
-    :ok = :gen_tcp.send(socket, "HELLO #{payload}\r\n")
-    {:ok, "+OK\r\n"} = :gen_tcp.recv(socket, 0)
+    :ok = transport.send(socket, "HELLO #{payload}\r\n")
+    {:ok, "+OK\r\n"} = transport.recv(socket, 0)
   end
 
   # If asking for a line, then go into line mode and get whole line.
-  defp setup_size(socket, :line) do
-    :inet.setopts(socket, packet: :line)
+  defp setup_size(transport, socket, :line) do
+    setopts_mod(transport).setopts(socket, packet: :line)
     0
   end
 
   # Asking for a specified number of bytes.
-  defp setup_size(socket, n) do
-    :inet.setopts(socket, packet: :raw)
+  defp setup_size(transport, socket, n) do
+    setopts_mod(transport).setopts(socket, packet: :raw)
     n
   end
 
@@ -136,6 +147,13 @@ defmodule Faktory.Connection do
   defp hostname do
     {:ok, hostname} = :inet.gethostname
     to_string(hostname)
+  end
+
+  defp setopts_mod(transport) do
+    case transport do
+      :ssl -> :ssl
+      :gen_tcp -> :inet
+    end
   end
 
 end
