@@ -1,5 +1,11 @@
 # faktory_worker_ex changes
 
+0.4.0
+-----------
+* The `:retries` option was renamed to `:retry`.
+* Handle non-exception based errors (`{:EXIT, pid, :killed}`).
+* More tests and test specific "callbacks" to aid in testing.
+
 0.3.1
 -----------
 * Update protocol to handle `$-1\r\n`
