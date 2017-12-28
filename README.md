@@ -25,7 +25,7 @@ Very similar to Sidekiq...
 defmodule FunWork do
   use Faktory.Job
 
-  faktory_options queue: "default", retries: 25, backtrace: 0
+  faktory_options queue: "default", retry: 25, backtrace: 0
 
   def perform(x, y) do
     IO.puts "#{x} is a fun number! ... #{y} is not... :("
