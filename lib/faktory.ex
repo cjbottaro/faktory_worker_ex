@@ -52,6 +52,12 @@ defmodule Faktory do
       middleware -> middleware
     end
 
+    # To facilitate testing, we keep a map if jid -> pid and send messages to
+    # the pid at various points in the job's lifecycle.
+    if Mix.env == :test do
+      TestJidPidMap.register(job["jid"])
+    end
+
     traverse_middleware(job, middleware)
 
     %{ "jid" => jid, "args" => args } = job

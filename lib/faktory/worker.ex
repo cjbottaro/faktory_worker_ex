@@ -45,9 +45,9 @@ defmodule Faktory.Worker do
   # This gets triggered when the worker process ends. At this point we either
   # have a successully run job or a failure. Either way, we need to restart
   # the main loop.
-  def handle_info({:DOWN, _ref, :process, pid, reason}, %{worker_pid: worker_pid} = state)
+  def handle_info({:EXIT, pid, :normal}, %{worker_pid: worker_pid} = state)
   when pid == worker_pid do
-    Logger.debug("Worker stopped #{inspect(reason)}") # This better not be anything other than :normal!
+    Logger.debug("Worker stopped :normal")
     case state do
       %{error: nil} -> report_ack(state)
       %{error: _error} -> report_fail(state)
@@ -55,8 +55,13 @@ defmodule Faktory.Worker do
     {:noreply, next(state)}
   end
 
-  def handle_info({:EXIT, pid, :normal}, %{worker_pid: worker_pid} = state) do
-    {:noreply, state}
+  def handle_info({:EXIT, pid, :killed}, %{worker_pid: worker_pid} = state)
+  when pid == worker_pid do
+    Logger.debug("Worker stopped :killed")
+
+    report_fail(%{state | error: {"killed", "", ""}})
+
+    {:noreply, next(state)}
   end
 
   def handle_info({:EXIT, pid, {errtype, trace} = reason}, %{worker_pid: worker_pid} = state)
@@ -81,7 +86,6 @@ defmodule Faktory.Worker do
   # If we have a job, then run it in a separate, monitored process and just wait.
   def execute(%{job: job} = state) do
     {:ok, worker_pid} = Executor.start_link(self(), state.middleware)
-    Process.monitor(worker_pid)
     GenServer.cast(worker_pid, {:run, job})
 
     %{"jid" => jid, "jobtype" => jobtype, "args" => args} = job
@@ -99,23 +103,33 @@ defmodule Faktory.Worker do
   defp report_ack(%{job: job, start_time: start_time} = state) do
     jid = job["jid"]
     jobtype = job["jobtype"]
+    time = elapsed(start_time)
 
-    Logger.info("✓ #{inspect(self())} jid-#{jid} (#{jobtype}) #{elapsed(start_time)}s")
+    Logger.info("✓ #{inspect(self())} jid-#{jid} (#{jobtype}) #{time}s")
 
     {:ok, _} = with_conn(state, &Protocol.ack(&1, jid))
     Logger.debug("ack'ed #{jid}")
+
+    if Mix.env == :test do
+      send TestJidPidMap.get(jid), {:report_ack, %{job: job, time: time}}
+    end
   end
 
   defp report_fail(%{job: job, error: error, start_time: start_time} = state) do
     jid = job["jid"]
     jobtype = job["jobtype"]
+    time = elapsed(start_time)
 
-    Logger.info("✘ #{inspect(self())} jid-#{jid} (#{jobtype}) #{elapsed(start_time)}s")
+    Logger.info("✘ #{inspect(self())} jid-#{jid} (#{jobtype}) #{time}s")
 
     {errtype, message, trace} = error
     trace = String.split(trace, "\n")
     {:ok, _} = with_conn(state, &Protocol.fail(&1, jid, errtype, message, trace))
     Logger.debug("fail'ed #{jid}")
+
+    if Mix.env == :test do
+      send TestJidPidMap.get(jid), {:report_fail, %{job: job, time: time, error: error}}
+    end
   end
 
   defp format_error({errtype, message, trace}) do
