@@ -31,18 +31,7 @@ defmodule Faktory.Connection do
     host = String.to_charlist(host)
     transport = if use_tls, do: :ssl, else: :gen_tcp
 
-    certs = :certifi.cacerts()
-
-    base_opts = [:binary, active: false]
-    tcp_opts = if use_tls do
-      # Disable TLS verification in dev/test so that self-signed certs will work
-      verify_opts = if Mix.env in [:dev, :test], do: [verify: :verify_none], else: [verify: :verify_peer]
-      base_opts ++ verify_opts ++ [versions: [:'tlsv1.2'], depth: 99, cacerts: certs]
-    else
-      base_opts
-    end
-
-    case transport.connect(host, port, tcp_opts, @default_timeout) do
+    case transport.connect(host, port, tcp_opts(state), @default_timeout) do
       {:ok, socket} ->
         handshake!(transport, socket, state.wid)
         {:ok, %{state | socket: socket, transport: transport}}
@@ -155,6 +144,24 @@ defmodule Faktory.Connection do
     case transport do
       :ssl -> :ssl
       :gen_tcp -> :inet
+    end
+  end
+
+  defp tcp_opts(%{use_tls: use_tls}) do
+    certs = :certifi.cacerts()
+    base_opts = [:binary, active: false]
+
+    if use_tls do
+      # Disable TLS verification in dev/test so that self-signed certs will work
+      verify_opts =
+        case Faktory.Utils.env() do
+          :prod -> [verify: :verify_peer]
+          _     -> [verify: :verify_none]
+        end
+
+      base_opts ++ verify_opts ++ [versions: [:'tlsv1.2'], depth: 99, cacerts: certs]
+    else
+      base_opts
     end
   end
 
