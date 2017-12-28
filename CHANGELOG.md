@@ -1,5 +1,9 @@
 # faktory_worker_ex changes
 
+0.3.1
+-----------
+* Update protocol to handle `$-1\r\n`
+
 0.3.0
 -----------
 * Configure with Mix Config and callback.
