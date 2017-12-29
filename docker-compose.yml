@@ -15,3 +15,9 @@ services:
     ports:
       - "7421:7419"
       - "7422:7420"
+
+  test_tls:
+    image: acjensen/faktory-tls:latest
+    ports:
+      - "7423:7419"
+      - "7424:7420"
