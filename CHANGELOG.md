@@ -2,13 +2,13 @@
 
 0.4.0
 -----------
-* The `:retries` option was renamed to `:retry`.
-* Handle non-exception based errors (`{:EXIT, pid, :killed}`).
+* Faktory 0.6.x support @acj @valo
+* Authentication support @acj
+* TLS support @acj
+* The `:retries` option was renamed to `:retry` @valo
+* Handle non-exception based errors (`{:EXIT, pid, :killed}`) @valo
 * More tests and test specific "callbacks" to aid in testing.
-
-0.3.1
------------
-* Update protocol to handle `$-1\r\n`
+* Update protocol to handle `$-1\r\n` @valo
 
 0.3.0
 -----------
