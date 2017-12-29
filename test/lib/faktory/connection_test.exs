@@ -31,7 +31,7 @@ defmodule Faktory.ConnectionTest do
       wid: "123abc",
       password: nil
     })
-    :timer.sleep(10)
+    :timer.sleep(10) # Ugh, I hate this.
 
     output = Mock.get_send_buf(mock)
     unix_pid = System.get_pid |> String.to_integer

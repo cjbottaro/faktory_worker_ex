@@ -2,7 +2,6 @@ defmodule Faktory.Connection do
   @moduledoc false
   use Connection
   alias Faktory.Logger
-  import Faktory.TestHelp, only: [if_test: 1]
 
   @default_timeout 4000
 
