@@ -9,9 +9,7 @@ defmodule Faktory do
   # A connection to the Faktory server.
   @type conn :: pid
 
-  # This should match what's in mix.exs. I couldn't figure out how to just
-  # use what's in mix.exs. That would be nice.
-  @app_name :faktory_worker_ex
+  @app_name Application.get_application(__MODULE__)
 
   alias Faktory.{Logger, Protocol, Utils, Configuration}
 

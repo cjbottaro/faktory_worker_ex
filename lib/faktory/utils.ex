@@ -69,9 +69,15 @@ defmodule Faktory.Utils do
   end
 
   def env do
+
+    # Not really dry since Faktory does this same call to populate a module var,
+    # but we can't call functions on Faktory otherwise we get a circular
+    # dependency and deadlock errors.
+    app_name = Application.get_application(Faktory)
+
     cond do
       function_exported?(Mix, :env, 1) -> Mix.env
-      Application.get_env(@app_name, :env) != nil -> Application.get_env(@app_name, :env)
+      Application.get_env(app_name, :env) -> Application.get_env(app_name, :env)
       Map.has_key?(System.get_env, "MIX_ENV") -> System.get_env("MIX_ENV")
       true -> :dev
     end
