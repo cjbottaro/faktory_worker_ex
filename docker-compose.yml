@@ -3,15 +3,15 @@ version: "3"
 services:
 
   dev:
-    image: contribsys/faktory:0.5.0
-    command: -b :7419 -no-tls -l debug
+    image: contribsys/faktory:latest
+    command: -b :7419 -l debug
     ports:
       - "7419:7419"
       - "7420:7420"
 
   test:
-    image: contribsys/faktory:0.5.0
-    command: -b :7419 -no-tls -l debug
+    image: contribsys/faktory:latest
+    command: -b :7419 -l debug
     ports:
       - "7421:7419"
       - "7422:7420"

@@ -83,4 +83,13 @@ defmodule Faktory.Utils do
     end
   end
 
+  def hash_password(iterations, password, salt) do
+    1..iterations
+    |> Enum.reduce(password <> salt, fn(_i, acc) ->
+      :crypto.hash(:sha256, acc)
+    end)
+    |> Base.encode16()
+    |> String.downcase()
+  end
+
 end
