@@ -127,8 +127,17 @@ defmodule Faktory.Configuration do
       |> put_from_env(:host, :host)
       |> put_from_env(:port, :port)
       |> put_from_env(:password, :password)
+      |> put_from_env(:use_tls, :use_tls)
       |> put_from_env(:fn, :config_fn)
       |> Keyword.put(:name, name)
+
+    # TODO: Support the rest of the CLI options
+    cli_options = Application.get_env(:faktory_worker_ex, :cli_options)
+    config = if use_tls = cli_options[:use_tls] do
+      config ++ [use_tls: use_tls]
+    else
+      config
+    end
 
     # Convert to struct.
     config = struct!(type, config)
