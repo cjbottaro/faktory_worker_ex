@@ -1,4 +1,5 @@
 defmodule Faktory.TestHelp do
+  @moduledoc false
 
   defmacro if_test(do: block) do
     if Faktory.Utils.env == :test do
