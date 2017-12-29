@@ -15,6 +15,8 @@ defmodule Faktory do
 
   alias Faktory.{Logger, Protocol, Utils, Configuration}
 
+  defdelegate env, to: Utils
+
   @doc false
   def start_workers? do
     !!get_env(:start_workers)
@@ -35,6 +37,7 @@ defmodule Faktory do
   @spec push(atom | binary, Keyword.t, [term]) :: jid
   def push(module, args, options \\ []) do
     import Faktory.Utils, only: [new_jid: 0]
+    import Faktory.TestHelp, only: [if_test: 1]
 
     module = Module.safe_concat([module])
     options = Keyword.merge(module.faktory_options, options)
@@ -54,7 +57,7 @@ defmodule Faktory do
 
     # To facilitate testing, we keep a map if jid -> pid and send messages to
     # the pid at various points in the job's lifecycle.
-    if Mix.env == :test do
+    if_test do
       TestJidPidMap.register(job["jid"])
     end
 

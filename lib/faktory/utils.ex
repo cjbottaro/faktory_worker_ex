@@ -68,4 +68,13 @@ defmodule Faktory.Utils do
     :os.system_time(:milli_seconds)
   end
 
+  def env do
+    cond do
+      function_exported?(Mix, :env, 1) -> Mix.env
+      Application.get_env(@app_name, :env) != nil -> Application.get_env(@app_name, :env)
+      Map.has_key?(System.get_env, "MIX_ENV") -> System.get_env("MIX_ENV")
+      true -> :dev
+    end
+  end
+
 end

@@ -4,6 +4,7 @@ defmodule Faktory.Worker do
 
   alias Faktory.{Logger, Protocol, Executor}
   import Faktory.Utils, only: [now_in_ms: 0]
+  import Faktory.TestHelp, only: [if_test: 1]
 
   def start_link(config) do
     GenServer.start_link(__MODULE__, config)
@@ -110,7 +111,7 @@ defmodule Faktory.Worker do
     {:ok, _} = with_conn(state, &Protocol.ack(&1, jid))
     Logger.debug("ack'ed #{jid}")
 
-    if Mix.env == :test do
+    if_test do
       send TestJidPidMap.get(jid), {:report_ack, %{job: job, time: time}}
     end
   end
@@ -127,7 +128,7 @@ defmodule Faktory.Worker do
     {:ok, _} = with_conn(state, &Protocol.fail(&1, jid, errtype, message, trace))
     Logger.debug("fail'ed #{jid}")
 
-    if Mix.env == :test do
+    if_test do
       send TestJidPidMap.get(jid), {:report_fail, %{job: job, time: time, error: error}}
     end
   end
