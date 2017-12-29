@@ -65,11 +65,16 @@ defmodule Faktory.Worker do
     {:noreply, next(state)}
   end
 
-  def handle_info({:EXIT, pid, {errtype, trace} = reason}, %{worker_pid: worker_pid} = state)
+  def handle_info({:EXIT, pid, reason}, %{worker_pid: worker_pid} = state)
   when pid == worker_pid do
-    Logger.debug("Worker exitted unexpectedly #{inspect(reason)}")
+    Logger.debug("Worker stopped :exit")
 
-    report_fail(%{state | error: {errtype, inspect(trace), ""}})
+    # reason is some Erlang tuple. Luckily, Elixir gives us some functions to
+    # format it into an exception with trace. Unfortunately, it's a string and
+    # we have to parse it into {errtype, message, trace}.
+    error = Exception.format_exit(reason) |> parse_format_exit
+
+    report_fail(%{state | error: error})
 
     {:noreply, next(state)}
   end
@@ -148,6 +153,30 @@ defmodule Faktory.Worker do
       :exit, {:timeout, _} ->
         Logger.warn("connection pool timeout")
         with_conn(%{config_module: pool}, f)
+    end
+  end
+
+
+  # string looks like this:
+  # Task #PID<0.227.0> started from #PID<0.226.0> terminating
+  # ** (ArithmeticError) bad argument in arithmetic expression
+  #   (faktory_worker_ex) test/support/die_worker.ex:8: anonymous fn/0 in DieWorker.perform/1
+  #   (elixir) lib/task/supervised.ex:85: Task.Supervised.do_apply/2
+  #   (stdlib) proc_lib.erl:247: :proc_lib.init_p_do_apply/3
+  defp parse_format_exit(string) do
+    try do
+      [_, banner | trace] = String.split(string, "\n")
+        |> Enum.map(&String.trim/1)
+      [_, errtype, message | []] = String.split(banner, " ", parts: 3)
+      errtype = errtype
+        |> String.trim_leading("(")
+        |> String.trim_trailing(")")
+      trace = Enum.join(trace, "\n")
+      {errtype, message, trace}
+    rescue
+      _ ->
+        Logger.error("Failed to parse error message:\n#{string}")
+        {"<internal_error>", "see logs", ""}
     end
   end
 

@@ -3,7 +3,7 @@ defmodule BasicTest do
 
   setup do
     Stack.clear
-    
+
     :ok
   end
 
@@ -41,12 +41,20 @@ defmodule BasicTest do
     assert {"ArithmeticError", _, _} = error
   end
 
-  test "worker handles {:EXIT, pid, :KILLED}" do
-    job = DieWorker.perform_async([true])
+  test "worker handles executor dying from brutal kill" do
+    job = DieWorker.perform_async([:kill])
     jid = job["jid"]
 
     assert_receive {:report_fail, %{job: %{"jid" => ^jid}, error: error}}
     assert {"killed", _, _} = error
+  end
+
+  test "worker handles executor dying from linked process" do
+    job = DieWorker.perform_async([:spawn])
+    jid = job["jid"]
+
+    assert_receive {:report_fail, %{job: %{"jid" => ^jid}, error: error}}
+    assert {"UndefinedFunctionError", _, _} = error
   end
 
 end
