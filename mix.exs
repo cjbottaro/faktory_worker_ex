@@ -9,6 +9,7 @@ defmodule Faktory.Mixfile do
       start_permanent: Mix.env == :prod,
       deps: deps(),
       elixirc_paths: elixirc_paths(Mix.env),
+      aliases: aliases(),
 
       # Hex
       description: "Elixir worker for Faktory",
@@ -53,5 +54,11 @@ defmodule Faktory.Mixfile do
 
   defp elixirc_paths(_) do
     ["lib"]
+  end
+
+  defp aliases do
+    [
+      "compile": ["compile --warnings-as-errors"]
+    ]
   end
 end
