@@ -2,6 +2,7 @@ defmodule Faktory.Connection do
   @moduledoc false
   use Connection
   alias Faktory.Logger
+  import Faktory.Utils, only: [if_test: 1]
 
   @default_timeout 4000
 
@@ -33,8 +34,9 @@ defmodule Faktory.Connection do
 
     case tcp.connect(state) do
       {:ok, socket} ->
-        handshake!(tcp, socket, state.wid, state.password)
-        {:ok, %{state | socket: socket}}
+        state = %{state | socket: socket}
+        handshake!(state)
+        {:ok, state}
       {:error, error} ->
         Logger.warn("Connection failed to #{host}:#{port} (#{error})")
         {:backoff, 1000, state}
@@ -104,7 +106,9 @@ defmodule Faktory.Connection do
     end
   end
 
-  defp handshake!(tcp, socket, wid, password) do
+  defp handshake!(state) do
+    %{tcp: tcp, socket: socket, wid: wid, password: password} = state
+
     tcp.setup_size(socket, :line)
     {:ok, <<"+HI", rest::binary>>} = tcp.recv(socket, 0)
 
@@ -127,6 +131,10 @@ defmodule Faktory.Connection do
 
     :ok = tcp.send(socket, "HELLO #{payload}\r\n")
     {:ok, "+OK\r\n"} = tcp.recv(socket, 0)
+
+    if_test do
+      Map.has_key?(state, :test_pid) && Kernel.send(state.test_pid, :handshake_done)
+    end
   end
 
   defp password_opts(nil, %{"s" => _salt}), do: raise "This server requires a password, but a password hasn't been configured"

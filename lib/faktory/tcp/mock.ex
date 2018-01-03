@@ -3,12 +3,7 @@ defmodule Faktory.Tcp.Mock do
 
   @default_timeout 4000
 
-  def connect(_options) do
-    case Process.whereis(__MODULE__) do
-      nil -> Faktory.Tcp.Mock.start_link
-      pid -> {:ok, pid}
-    end
-  end
+  def connect(options), do: {:ok, options.mock_pid}
 
   # Returns :ok
   def close(_), do: :ok
@@ -44,8 +39,12 @@ defmodule Faktory.Tcp.Mock do
   end
 
   def start_link do
-    GenServer.start_link(__MODULE__, nil, name: __MODULE__)
+    GenServer.start_link(__MODULE__, nil)
   end
+
+  ####################
+  # GenServer stuffs #
+  ####################
 
   def init(_) do
     {:ok, %__MODULE__{}}

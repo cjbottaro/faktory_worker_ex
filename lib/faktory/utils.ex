@@ -92,4 +92,10 @@ defmodule Faktory.Utils do
     |> String.downcase()
   end
 
+  defmacro if_test(do: block) do
+    if Faktory.Utils.env == :test do
+      quote do: unquote(block)
+    end
+  end
+
 end
