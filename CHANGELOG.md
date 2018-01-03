@@ -1,5 +1,12 @@
 # faktory_worker_ex changes
 
+0.5.0
+-----------
+* Completely rewrote configuration system. See `Faktory.Configuration`.
+* Can enqueue to different Faktory servers via `perform_async/2`.
+* Middleware behaviours for clients and workers are now different.
+* Removed `set/1` and `set/2` in favor of passing options to `perform_async/2`.
+
 0.4.0
 -----------
 * Faktory 0.6.x support @acj @valo

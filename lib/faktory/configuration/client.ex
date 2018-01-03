@@ -1,9 +1,29 @@
 defmodule Faktory.Configuration.Client do
   @moduledoc false
 
-  defstruct [
-    host: "localhost", port: 7419, pool: 10, middleware: [], fn: nil,
-    name: "default", wid: nil, password: nil, use_tls: false
+  @defaults [
+    host: "localhost", port: 7419, pool: 10, middleware: [], wid: nil,
+    password: nil, use_tls: false
   ]
+
+  def defaults, do: @defaults
+
+  defmacro __using__(_options) do
+    quote do
+
+      def config do
+        alias Faktory.Configuration
+        Configuration.config(__MODULE__, Configuration.Client.defaults)
+      end
+
+      def init(config), do: config
+      defoverridable [init: 1]
+
+      def type, do: :client
+      def client?, do: type() == :client
+      def worker?, do: type() == :worker
+
+    end
+  end
 
 end

@@ -39,6 +39,13 @@ defmodule Faktory do
 
     module = Module.safe_concat([module])
     options = Keyword.merge(module.faktory_options, options)
+    client = options[:client] || Configuration.default_client
+
+    if !Configuration.exists?(client) do
+      name = Faktory.Utils.module_name(client)
+      raise Faktory.Error.ClientNotConfigured,
+        message: "#{name} not configured"
+    end
 
     jobtype = Utils.module_name(module)
     job = options
@@ -48,18 +55,16 @@ defmodule Faktory do
     # This is weird, middleware is configured in the client config module,
     # but we allow overriding in faktory_options and thus push options.
     middleware = case options[:middleware] do
-      nil -> Configuration.fetch(:client).middleware
-      [] -> Configuration.fetch(:client).middleware
+      nil -> client.config.middleware
+      [] -> client.config.middleware
       middleware -> middleware
     end
 
-    # To facilitate testing, we keep a map if jid -> pid and send messages to
+    # To facilitate testing, we keep a map of jid -> pid and send messages to
     # the pid at various points in the job's lifecycle.
-    if_test do
-      TestJidPidMap.register(job["jid"])
-    end
+    if_test do: TestJidPidMap.register(job["jid"])
 
-    traverse_middleware(job, middleware)
+    traverse_middleware(job, middleware, options)
 
     %{ "jid" => jid, "args" => args } = job
     Logger.debug "Q #{inspect self()} jid-#{jid} (#{jobtype}) #{inspect(args)}"
@@ -67,17 +72,17 @@ defmodule Faktory do
     job
   end
 
-  defp traverse_middleware(job, []) do
-    do_push(job)
+  defp traverse_middleware(job, [], options) do
+    do_push(job, options)
     job
   end
 
-  defp traverse_middleware(job, [middleware | chain]) do
-    middleware.call(job, chain, &traverse_middleware/2)
+  defp traverse_middleware(job, [middleware | chain], options) do
+    middleware.call(job, chain, &traverse_middleware/3, options)
   end
 
-  defp do_push(job) do
-    with_conn(&Protocol.push(&1, job))
+  defp do_push(job, options) do
+    with_conn(options, &Protocol.push(&1, job))
   end
 
   @doc """
@@ -87,8 +92,8 @@ defmodule Faktory do
   Checks out a connection from the _client_ pool.
   """
   @spec info :: map
-  def info do
-    with_conn(&Protocol.info(&1))
+  def info(options \\ []) do
+    with_conn(options, &Protocol.info(&1))
   end
 
   @doc """
@@ -98,8 +103,8 @@ defmodule Faktory do
   Checks out a connection from the _client_ pool.
   """
   @spec flush :: :ok | {:error, binary}
-  def flush do
-    with_conn(&Protocol.flush(&1))
+  def flush(options \\ []) do
+    with_conn(options, &Protocol.flush(&1))
   end
 
   @doc """
@@ -134,10 +139,10 @@ defmodule Faktory do
     in. See the (undocument) `Faktory.Protocol` module for what you can do
     with a connection.
   """
-  @spec with_conn((conn -> term)) :: term
-  def with_conn(func) do
-    config = Configuration.fetch(:client)
-    :poolboy.transaction(config.name, func)
+  @spec with_conn(Keyword.t, (conn -> term)) :: term
+  def with_conn(options, func) do
+    client = options[:client] || Configuration.default_client
+    :poolboy.transaction(client, func)
   end
 
 end

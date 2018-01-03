@@ -83,144 +83,86 @@ defmodule Faktory.Configuration do
   ```
   """
 
-  alias Faktory.Utils
-  alias Faktory.Configuration.{Client, Worker}
-
-  @doc false
-  def init do
-    :ets.new(__MODULE__, [:set, :public, :named_table])
-    init(:clients)
-    init(:workers)
+  def all do
+    Enum.map(modules(), fn module ->
+      {module, Map.delete(module.config, :module)}
+    end)
   end
 
+  # We allow for runtime configuration via environment variables and the init/1
+  # callback. Also, wid needs to be determined at runtime. Once that's all
+  # done, we memoize the config so the wid doesn't change and we don't waste
+  # cpu cycles recalculating the dynamic config.
   @doc false
-  def init(:clients) do
-    if get_env(:client) && get_env(:clients) do
-      raise "configuration cannot have both :client and :clients"
-    end
+  def config(module, defaults) do
+    import Application, only: [get_env: 2, put_env: 3]
+    import Faktory.Utils, only: [new_wid: 0]
 
-    raw_configs_for(:client)
-      |> Enum.each(fn {name, config} ->
-        config = resolve_config(Client, name, config)
-        :ets.insert(__MODULE__, {config.name, config})
-      end)
-  end
+    memoized_key = {module, :memoized}
 
-  @doc false
-  def init(:workers) do
-    if get_env(:worker) && get_env(:workers) do
-      raise "configuration cannot have both :worker and :workers"
-    end
-
-    raw_configs_for(:worker)
-      |> Enum.each(fn {name, config} ->
-        config = resolve_config(Worker, name, config)
-        :ets.insert(__MODULE__, {config.name, config})
-      end)
-  end
-
-  @doc false
-  def resolve_config(type, name, config) do
-
-    # Pull over top level options.
-    config = config
-      |> put_from_env(:host, :host)
-      |> put_from_env(:port, :port)
-      |> put_from_env(:password, :password)
-      |> put_from_env(:use_tls, :use_tls)
-      |> put_from_env(:fn, :config_fn)
-      |> Keyword.put(:name, name)
-
-    # TODO: Support the rest of the CLI options
-    cli_options = Application.get_env(:faktory_worker_ex, :cli_options)
-    config = if use_tls = cli_options[:use_tls] do
-      config ++ [use_tls: use_tls]
+    if get_env(:faktory_worker_ex, memoized_key) do
+      get_env(:faktory_worker_ex, module)
     else
+      put_env(:faktory_worker_ex, memoized_key, true)
+      config = get_env(:faktory_worker_ex, module)
+      config = Keyword.merge(defaults, config)
+        |> Keyword.put(:wid, new_wid())
+        |> module.init
+        |> resolve_all_env_vars
+        |> Keyword.put(:module, module)
+        |> Keyword.put(:type, module.type)
+        |> Map.new
+      put_env(:faktory_worker_ex, module, config)
       config
     end
-
-    # Convert to struct.
-    config = struct!(type, config)
-
-    # Runtime configuration callback.
-    config = case config.fn do
-      nil -> config
-      f -> f.(config)
-    end
-
-    # Add proper name and wid.
-    config = %{config | name: name(type, name), wid: Utils.new_wid()}
-
-    # Maybe default :pool to :concurrency.
-    if type == Worker do
-      Utils.default_from_key(config, :pool, :concurrency)
-    else
-      config
-    end
-
   end
 
-  defp name(type, name) do
-    case type do
-      Client -> "client/#{name}"
-      Worker -> "worker/#{name}"
-      _ -> "#{type}/#{name}"
-    end |> String.to_atom
+  # Get all configuration modules. Gets both clients and workers.
+  @doc false
+  def modules do
+    Application.get_all_env(:faktory_worker_ex)
+      |> Enum.reduce([], fn {module, _}, acc ->
+        try do
+          module.config
+          module.client?
+          module.worker?
+          [module | acc]
+        rescue
+          UndefinedFunctionError -> acc
+        end
+      end)
+      |> Enum.reverse
   end
 
-  @doc """
-  Get client or worker config.
-
-  Resolves all the values from Mix Config, runs any runtime config callbacks,
-  and returns a struct representing the config.
-  """
-  @spec fetch(:client | :worker, atom) :: struct
-  def fetch(type, name \\ :default) do
-    name = name(type, name)
-    [{_name, config}] = :ets.lookup(__MODULE__, name)
-    config
+  @doc false
+  def modules(type) do
+    Enum.filter(modules, & &1.type == type)
   end
 
-  @doc """
-  Fetch all configuration.
-
-  Returns both client and worker configs.
-  """
-  @spec fetch_all :: [struct]
-  def fetch_all do
-    # Jeez that's some clunky syntax, Erlang.
-    :ets.match(__MODULE__, {:"_", :"$1"}) |> List.flatten
+  # Return the default (first defined) client module.
+  @doc false
+  def default_client do
+    Enum.find(modules(), & &1.client?) || raise Faktory.Error.NoClientsConfigured
   end
 
-  @doc """
-  Fetch client or worker configs.
-  """
-  @spec fetch_all(:client | :worker) :: [struct]
-  def fetch_all(type) do
-    type = case type do
-      :client -> Client
-      :worker -> Worker
-      _ -> type
-    end
+  # Return true if the given module is a configuration module.
+  @doc false
+  def exists?(module), do: !!Enum.find(modules(), & &1 == module)
 
-    Enum.filter(fetch_all(), & &1.__struct__ == type)
+  defp resolve_all_env_vars(config) do
+    Enum.map(config, fn {k, v} ->
+      v = case v do
+        {:system, name, default} -> resolve_env_var(name, default)
+        {:system, name} -> resolve_env_var(name)
+        v -> v
+      end
+      {k, v}
+    end)
   end
 
-  defp get_env(key) do
-    Application.get_env(:faktory_worker_ex, key)
-  end
-
-  defp put_from_env(enum, dst, src) do
-    Utils.put_unless_nil(enum, dst, get_env(src))
-  end
-
-  defp raw_configs_for(type) do
-    plural = "#{type}s" |> String.to_atom
-
-    case get_env(type) do
-      nil -> get_env(plural) || [{:default, []}]
-      config -> [{:default, config}]
-    end
+  defp resolve_env_var(name, default \\ nil) do
+    name = to_string(name) |> String.upcase
+    System.get_env(name) || default
   end
 
 end

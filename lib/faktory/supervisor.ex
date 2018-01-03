@@ -9,18 +9,19 @@ defmodule Faktory.Supervisor do
   def init(nil) do
     alias Faktory.Configuration
 
-    # Only start the workers from the mix task.
-    children = if Faktory.start_workers? do
-      [{Faktory.Supervisor.Workers, Configuration.fetch(:worker)}]
-    else
-      []
-    end
+    clients = Enum.filter(Configuration.modules, & &1.client?)
+    workers = Enum.filter(Configuration.modules, & &1.worker?)
 
-    # Always start the clients supervisor.
-    children = [
-      {Faktory.Supervisor.Clients, Configuration.fetch(:client)}
-      | children
-    ]
+    children = if Faktory.start_workers? do
+      [
+        {Faktory.Supervisor.Clients, clients},
+        {Faktory.Supervisor.Workers, workers}
+      ]
+    else
+      [
+        {Faktory.Supervisor.Clients, clients},
+      ]
+    end
 
     Supervisor.init(children, strategy: :one_for_one)
   end

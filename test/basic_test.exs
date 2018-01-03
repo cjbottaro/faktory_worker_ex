@@ -16,19 +16,13 @@ defmodule BasicTest do
   end
 
   test "client middleware" do
-    AddWorker.perform_async(
-      [middleware: [BadMath]],
-      [PidMap.register, 1, 2]
-    )
+    AddWorker.perform_async([PidMap.register, 1, 2], middleware: [BadMath])
 
     assert_receive {:add_result, 5}
   end
 
   test "worker middleware" do
-    AddWorker.perform_async(
-      [queue: "middleware"],
-      [PidMap.register, 1, 2]
-    )
+    AddWorker.perform_async([PidMap.register, 1, 2], queue: "middleware")
 
     assert_receive {:add_result, 5}
   end

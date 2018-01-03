@@ -1,40 +1,47 @@
 defmodule Faktory.Supervisor.Workers do
   @moduledoc false
   use Supervisor
+  require Faktory.Logger
 
-  def start_link(config) do
-    name = {:global, {__MODULE__, config.name}}
-    Supervisor.start_link(__MODULE__, config, name: name)
+  def start_link(config_modules) do
+    Supervisor.start_link(__MODULE__, config_modules, name: __MODULE__)
   end
 
-  def init(config) do
+  def init([]), do: Supervisor.init([], strategy: :one_for_one)
 
-    # Worker processes
-    children = Enum.map 1..config.concurrency, fn i ->
-      Supervisor.child_spec(
-        {Faktory.Worker, config},
-        id: {Faktory.Worker, config.name, i}
-      )
-    end
+  def init(config_modules) do
+    children(config_modules) |>
+      Supervisor.init(strategy: :one_for_one)
+  end
 
-    # Add poolboy process and heartbeat process.
-    children = [
-      pool_spec(config),
-      {Faktory.Heartbeat, config}
-      | children
-    ]
+  def children(config_modules) do
+    Enum.flat_map(config_modules, fn module ->
+      config = module.config
 
-    Supervisor.init(children, strategy: :one_for_one)
+      # It is really important that the Poolboy workers start before the actual
+      # workers otherwise the workers will try to checkout connections before
+      # the pools are ready. Consider rearranging the supervisor tree.
+
+      [
+        pool_spec(config),
+        Supervisor.child_spec({Faktory.Heartbeat, config}, id: {module, :heartbeat})
+      ]
+      ++
+      Enum.map(1..config.concurrency, fn i ->
+        Supervisor.child_spec({Faktory.Worker, config}, id: {module, i})
+      end)
+
+    end) |> IO.inspect
   end
 
   defp pool_spec(config) do
     pool_options = [
-      name: {:local, config.name},
+      name: {:local, config.module},
       worker_module: Faktory.Connection,
       size: config.pool,
       max_overflow: 0
     ]
-    :poolboy.child_spec(config.name, pool_options, config)
+    :poolboy.child_spec(config.module, pool_options, config)
   end
 
 end
