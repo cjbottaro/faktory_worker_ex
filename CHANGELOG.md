@@ -1,5 +1,9 @@
 # faktory_worker_ex changes
 
+0.5.0
+-----------
+* (breaking) Simplified middleware; no longer pass the `chain` arg.
+
 0.4.0
 -----------
 * Faktory 0.6.x support @acj @valo
