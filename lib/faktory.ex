@@ -34,8 +34,7 @@ defmodule Faktory do
   """
   @spec push(atom | binary, Keyword.t, [term]) :: jid
   def push(module, args, options \\ []) do
-    import Faktory.Utils, only: [new_jid: 0]
-    import Faktory.TestHelp, only: [if_test: 1]
+    import Faktory.Utils, only: [new_jid: 0, if_test: 1]
     alias Faktory.Middleware
 
     module = Module.safe_concat([module])
