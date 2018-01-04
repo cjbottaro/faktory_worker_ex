@@ -9,10 +9,9 @@ defmodule Faktory do
   # A connection to the Faktory server.
   @type conn :: pid
 
-  @app_name Application.get_application(__MODULE__)
-
   alias Faktory.{Logger, Protocol, Utils, Configuration}
 
+  defdelegate app_name, to: Utils
   defdelegate env, to: Utils
 
   @doc false
@@ -108,12 +107,12 @@ defmodule Faktory do
 
   @doc false
   def get_env(key) do
-     Application.get_env(@app_name, key)
+     Application.get_env(app_name(), key)
   end
 
   @doc false
   def put_env(key, value) do
-    Application.put_env(@app_name, key, value)
+    Application.put_env(app_name(), key, value)
   end
 
   @doc """
