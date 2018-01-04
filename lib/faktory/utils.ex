@@ -73,7 +73,7 @@ defmodule Faktory.Utils do
     # Not really dry since Faktory does this same call to populate a module var,
     # but we can't call functions on Faktory otherwise we get a circular
     # dependency and deadlock errors.
-    app_name = Application.get_application(Faktory)
+    app_name = Faktory.app_name()
 
     cond do
       function_exported?(Mix, :env, 1) -> Mix.env

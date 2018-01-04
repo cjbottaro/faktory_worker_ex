@@ -207,7 +207,7 @@ defmodule Faktory.Configuration do
   end
 
   defp get_env(key) do
-    Application.get_env(:faktory_worker_ex, key)
+    Application.get_env(Faktory.app_name(), key)
   end
 
   defp put_from_env(enum, dst, src) do
