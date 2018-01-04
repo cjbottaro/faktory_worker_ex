@@ -15,15 +15,12 @@ defmodule Faktory.ConnectionTest do
     {:ok, _pid} = Connection.start_link(%{
       tcp: Mock,
       mock_pid: mock,
-      test_pid: self(),
       host: nil,
       port: nil,
       use_tls: false,
       wid: "123abc",
       password: nil
     })
-
-    assert_receive :handshake_done
 
     output = Mock.get_send_buf(mock)
     unix_pid = System.get_pid |> String.to_integer
