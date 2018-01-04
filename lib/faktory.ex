@@ -9,14 +9,9 @@ defmodule Faktory do
   # A connection to the Faktory server.
   @type conn :: pid
 
-  # Retain this at compile time since Mix.* will not be available in release builds
-  @app_name Mix.Project.config[:app]
-
-  @doc false
-  def app_name, do: @app_name
-
   alias Faktory.{Logger, Protocol, Utils, Configuration}
 
+  defdelegate app_name, to: Utils
   defdelegate env, to: Utils
 
   @doc false
@@ -112,12 +107,12 @@ defmodule Faktory do
 
   @doc false
   def get_env(key) do
-     Application.get_env(@app_name, key)
+     Application.get_env(app_name(), key)
   end
 
   @doc false
   def put_env(key, value) do
-    Application.put_env(@app_name, key, value)
+    Application.put_env(app_name(), key, value)
   end
 
   @doc """

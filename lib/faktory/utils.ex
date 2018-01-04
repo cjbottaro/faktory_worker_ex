@@ -1,6 +1,11 @@
 defmodule Faktory.Utils do
   @moduledoc false
 
+  # Retain this at compile time since Mix.* will not be available in release builds
+  @app_name Mix.Project.config[:app]
+
+  def app_name, do: @app_name
+
   def put_unless_nil(enum, _key, nil), do: enum
   def put_unless_nil(enum, key, value) when is_list(enum) do
     Keyword.put(enum, key, value)
@@ -69,15 +74,9 @@ defmodule Faktory.Utils do
   end
 
   def env do
-
-    # Not really dry since Faktory does this same call to populate a module var,
-    # but we can't call functions on Faktory otherwise we get a circular
-    # dependency and deadlock errors.
-    app_name = Faktory.app_name()
-
     cond do
       function_exported?(Mix, :env, 1) -> Mix.env
-      Application.get_env(app_name, :env) -> Application.get_env(app_name, :env)
+      Application.get_env(@app_name, :env) -> Application.get_env(@app_name, :env)
       Map.has_key?(System.get_env, "MIX_ENV") -> System.get_env("MIX_ENV")
       true -> :dev
     end
