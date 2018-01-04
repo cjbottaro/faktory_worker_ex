@@ -6,7 +6,7 @@ defmodule Faktory.Middleware do
 
   On the worker side, a middleware chain alters a job before it is processed.
 
-  It's just a simple behaviour that requires `call/3`. Almost no reason to
+  It's just a simple behaviour that requires `call/2`. Almost no reason to
   even make it a behaviour other than having a module to attach documentation to.
 
   Let's make worker middleware that logs how long jobs take to process.
@@ -17,14 +17,14 @@ defmodule Faktory.Middleware do
     import Faktory.Utils, only: [now_in_ms: 0]
     alias Faktory.Logger
 
-    def call(job, chain, f) do
+    def call(job, f) do
       # Alter the job by putting a start time in the custom field.
       job = job
         |> Map.put_new("custom", %{})
         |> put_in(["custom", "start_time"], now_in_ms())
 
       # Pass it along to get processed.
-      job = f.(job, chain)
+      job = f.(job)
 
       # Calculate the elapse time.
       elapsed = now_in_ms() - job["custom"]["start_time"]
@@ -54,7 +54,7 @@ defmodule Faktory.Middleware do
 
   It is important to capture the changes to the job after passing it along:
   ```elixir
-    job = f.(job, chain)
+    job = f.(job)
   ```
   That way you can see any changes made after handing it off and it comes
   back down the chain after being processed.
@@ -68,13 +68,35 @@ defmodule Faktory.Middleware do
 
   @type job :: map
 
-  @type chain :: [module]
-
   @doc """
-  Invokes the middleware
+  Invoke the middleware.
 
-  It's hard to explain. Just look at the example in the moduledoc.
+  The function invokes the next middleware in the chain. You can modify the job
+  both before and after invoking the function. The function may return a
+  modified job. `call/2` must return a job.
+
+  Example middleware that does nothing:
+  ```elixir
+    def call(job, f) do
+      f.(job)
+    end
+  ```
   """
-  @callback call(job, chain, (job, chain -> job)) :: job
+  @callback call(job, (job -> job)) :: job
+
+  @doc false
+  # This hurts my brain.
+  def traverse(job, chain, done_fn) do
+    walker = fn
+      job, [], _next ->
+        done_fn.(job)
+        job
+      job, [middleware | chain], next ->
+        monad = fn job -> next.(job, chain, next) end
+        middleware.call(job, monad)
+    end
+
+    walker.(job, chain, walker)
+  end
 
 end

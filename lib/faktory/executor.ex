@@ -1,7 +1,7 @@
 defmodule Faktory.Executor do
   @moduledoc false
   use GenServer
-  alias Faktory.{Logger, Utils}
+  alias Faktory.{Logger, Utils, Middleware}
 
   def start_link(worker, middleware) do
     GenServer.start_link(__MODULE__, {worker, middleware})
@@ -23,12 +23,10 @@ defmodule Faktory.Executor do
 
   defp perform(job, middleware) do
     Logger.debug "running job #{inspect(job)}"
-    traverse_middleware(job, middleware)
-  end
-
-  def dispatch(job) do
-    module = Module.safe_concat(Elixir, job["jobtype"])
-    apply(module, :perform, job["args"])
+    Middleware.traverse(job, middleware, fn job ->
+      module = Module.safe_concat(Elixir, job["jobtype"])
+      apply(module, :perform, job["args"])
+    end)
   end
 
   defp handle_error(error, worker) do
@@ -37,15 +35,6 @@ defmodule Faktory.Executor do
     trace = Exception.format_stacktrace(System.stacktrace)
     error = {errtype, message, trace}
     :ok = GenServer.call(worker, {:error_report, error})
-  end
-
-  def traverse_middleware(job, []) do
-    dispatch(job)
-    job
-  end
-
-  def traverse_middleware(job, [middleware | chain]) do
-    middleware.call(job, chain, &traverse_middleware/2)
   end
 
 end
