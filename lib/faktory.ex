@@ -9,7 +9,11 @@ defmodule Faktory do
   # A connection to the Faktory server.
   @type conn :: pid
 
-  @app_name Application.get_application(__MODULE__)
+  # Retain this at compile time since Mix.* will not be available in release builds
+  @app_name Mix.Project.config[:app]
+
+  @doc false
+  def app_name, do: @app_name
 
   alias Faktory.{Logger, Protocol, Utils, Configuration}
 
