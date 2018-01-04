@@ -98,4 +98,13 @@ defmodule Faktory.Utils do
     end
   end
 
+  def unix_pid do
+    System.get_pid |> String.to_integer
+  end
+
+  def hostname do
+    {:ok, hostname} = :inet.gethostname
+    to_string(hostname)
+  end
+
 end

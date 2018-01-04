@@ -2,7 +2,7 @@ defmodule Faktory.ConnectionTest do
   use ExUnit.Case, async: true
 
   alias Faktory.Tcp.Mock
-  alias Faktory.Connection
+  alias Faktory.{Connection, Utils}
 
   test "handshake!" do
     buf = "+HI"
@@ -15,7 +15,6 @@ defmodule Faktory.ConnectionTest do
     {:ok, _pid} = Connection.start_link(%{
       tcp: Mock,
       mock_pid: mock,
-      test_pid: self(),
       host: nil,
       port: nil,
       use_tls: false,
@@ -23,11 +22,8 @@ defmodule Faktory.ConnectionTest do
       password: nil
     })
 
-    assert_receive :handshake_done
-
     output = Mock.get_send_buf(mock)
-    unix_pid = System.get_pid |> String.to_integer
-    assert output == ~s(HELLO {"wid":"123abc","v":2,"pid":#{unix_pid},"labels":["elixir"],"hostname":"kaby"}\r\n)
+    assert output == ~s(HELLO {"wid":"123abc","v":2,"pid":#{Utils.unix_pid},"labels":["elixir"],"hostname":"#{Utils.hostname}"}\r\n)
   end
 
 end
