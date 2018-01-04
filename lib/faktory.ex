@@ -34,8 +34,8 @@ defmodule Faktory do
   """
   @spec push(atom | binary, Keyword.t, [term]) :: jid
   def push(module, args, options \\ []) do
-    import Faktory.Utils, only: [new_jid: 0]
-    import Faktory.TestHelp, only: [if_test: 1]
+    import Faktory.Utils, only: [new_jid: 0, if_test: 1]
+    alias Faktory.Middleware
 
     module = Module.safe_concat([module])
     options = Keyword.merge(module.faktory_options, options)
@@ -64,25 +64,14 @@ defmodule Faktory do
     # the pid at various points in the job's lifecycle.
     if_test do: TestJidPidMap.register(job["jid"])
 
-    traverse_middleware(job, middleware, options)
+    Middleware.traverse(job, middleware, fn job ->
+      with_conn(options, &Protocol.push(&1, job))
+    end)
 
     %{ "jid" => jid, "args" => args } = job
     Logger.debug "Q #{inspect self()} jid-#{jid} (#{jobtype}) #{inspect(args)}"
 
     job
-  end
-
-  defp traverse_middleware(job, [], options) do
-    do_push(job, options)
-    job
-  end
-
-  defp traverse_middleware(job, [middleware | chain], options) do
-    middleware.call(job, chain, &traverse_middleware/3, options)
-  end
-
-  defp do_push(job, options) do
-    with_conn(options, &Protocol.push(&1, job))
   end
 
   @doc """

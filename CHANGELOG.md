@@ -2,10 +2,11 @@
 
 0.5.0
 -----------
-* Completely rewrote configuration system. See `Faktory.Configuration`.
+* (breaking) Simplified middleware; no longer pass the `chain` arg.
+* (breaking) Completely rewrote configuration system. See `Faktory.Configuration`.
+* (breaking) Removed `set/1` and `set/2` in favor of passing `options` to `perform_async/2`.
+* (breaking) `perform_async/2` argument order reversed (`options` is 2nd arg now).
 * Can enqueue to different Faktory servers via `perform_async/2`.
-* Middleware behaviours for clients and workers are now different.
-* Removed `set/1` and `set/2` in favor of passing options to `perform_async/2`.
 
 0.4.0
 -----------

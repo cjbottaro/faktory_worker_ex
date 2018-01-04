@@ -1,16 +1,12 @@
 defmodule BadMath do
   use Faktory.Middleware
 
-  def call(job, chain, f, options \\ nil) do
+  def call(job, f) do
     job = Map.update! job, "args", fn [pid, x, y | []] ->
       [pid, x+1, y+1]
     end
 
-    if options do
-      f.(job, chain, options)
-    else
-      f.(job, chain)
-    end
+    f.(job)
   end
 
 end

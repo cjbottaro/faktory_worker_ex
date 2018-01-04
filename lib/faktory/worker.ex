@@ -3,8 +3,7 @@ defmodule Faktory.Worker do
   use GenServer
 
   alias Faktory.{Logger, Protocol, Executor}
-  import Faktory.Utils, only: [now_in_ms: 0]
-  import Faktory.TestHelp, only: [if_test: 1]
+  import Faktory.Utils, only: [now_in_ms: 0, if_test: 1]
 
   def start_link(config) do
     GenServer.start_link(__MODULE__, config)
