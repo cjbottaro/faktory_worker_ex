@@ -35,6 +35,7 @@ defmodule Faktory do
   @spec push(atom | binary, Keyword.t, [term]) :: jid
   def push(module, args, options \\ []) do
     import Faktory.Utils, only: [new_jid: 0, if_test: 1]
+    alias Faktory.Middleware
 
     module = Module.safe_concat([module])
     options = Keyword.merge(module.faktory_options, options)
@@ -58,25 +59,14 @@ defmodule Faktory do
       TestJidPidMap.register(job["jid"])
     end
 
-    traverse_middleware(job, middleware)
+    Middleware.traverse(job, middleware, fn job ->
+      with_conn(&Protocol.push(&1, job))
+    end)
 
     %{ "jid" => jid, "args" => args } = job
     Logger.debug "Q #{inspect self()} jid-#{jid} (#{jobtype}) #{inspect(args)}"
 
     job
-  end
-
-  defp traverse_middleware(job, []) do
-    do_push(job)
-    job
-  end
-
-  defp traverse_middleware(job, [middleware | chain]) do
-    middleware.call(job, chain, &traverse_middleware/2)
-  end
-
-  defp do_push(job) do
-    with_conn(&Protocol.push(&1, job))
   end
 
   @doc """

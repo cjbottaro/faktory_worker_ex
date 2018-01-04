@@ -6,7 +6,7 @@ defmodule DieWorker do
       "kill" -> Process.exit(self(), :kill)
       "spawn" ->
         # Cause an UndefinedFunctionError exception in a linked process.
-        Task.start_link(fn -> Factory.some_funky_function end)
+        Task.start_link(fn -> raise UndefinedFunctionError end)
         :timer.sleep(:infinity)
     end
   end

@@ -1,8 +1,6 @@
 defmodule Faktory.Tcp.Mock do
   defstruct [line_mode: false, recv_buf: "", send_buf: ""]
 
-  @default_timeout 4000
-
   def connect(options), do: {:ok, options.mock_pid}
 
   # Returns :ok
