@@ -1,12 +1,6 @@
 defmodule BasicTest do
   use ExUnit.Case
 
-  setup do
-    Stack.clear
-
-    :ok
-  end
-
   test "enqueing and processing a job" do
     job = AddWorker.perform_async([PidMap.register, 1, 2])
     jid = job["jid"]
