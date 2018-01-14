@@ -23,6 +23,7 @@ defmodule Faktory.Mixfile do
       docs: [
         extras: [
           "README.md": [title: "README"],
+          "CHANGELOG.md": [title: "CHANGELOG"],
           "Architecture.md": [title: "Architecture"],
         ]
       ]
