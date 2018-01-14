@@ -181,11 +181,13 @@ defmodule Faktory.Configuration do
     config = adapter.defaults
       |> Keyword.merge(options)
       |> module.init
+      |> handle_cli_options(module)
       |> adapter.reconfig
       |> resolve_all_env_vars
       |> Keyword.put(:wid, Faktory.Utils.new_wid)
       |> Keyword.put(:module, module)
       |> Map.new
+      |> IO.inspect
 
     put_env(module, config)
 
@@ -221,6 +223,18 @@ defmodule Faktory.Configuration do
       options[:adapter]
     else
       nil
+    end
+  end
+
+  defp handle_cli_options(options, module) do
+    if module.worker? do # CLI options only applicable to workers?
+      cli_options = get_env(:cli_options, [])
+      cli_options = cli_options
+        |> Faktory.Utils.put_unless_nil(:use_tls, cli_options[:tls])
+        |> Keyword.delete(:tls)
+      Keyword.merge(options, cli_options)
+    else
+      options
     end
   end
 
