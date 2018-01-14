@@ -60,9 +60,17 @@ docker run --rm -p 7419:7419 -p 7420:7420 contribsys/faktory:latest -b :7419
 
 You should be able to go to [http://localhost:7420](http://localhost:7420) and see the web ui.
 
+## Features
+
+* Middleware
+* Connection pooling
+* Support for multiple Faktory servers
+* Comprehensive supervision tree
+* Decent integration tests
+
 ## What's missing?
 
-* Responding to the terminate signal (from the Faktory server)
+* Responding to the terminate signal from the Faktory server
 
 ## Issues / Questions
 
