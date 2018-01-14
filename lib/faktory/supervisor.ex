@@ -9,8 +9,8 @@ defmodule Faktory.Supervisor do
   def init(nil) do
     alias Faktory.Configuration
 
-    clients = Enum.filter(Configuration.modules, & &1.client?)
-    workers = Enum.filter(Configuration.modules, & &1.worker?)
+    clients = Configuration.modules(:client)
+    workers = Configuration.modules(:worker)
 
     children = if Faktory.start_workers? do
       [

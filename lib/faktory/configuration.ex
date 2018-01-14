@@ -10,133 +10,158 @@ defmodule Faktory.Configuration do
 
   ### Defaults
 
+  If you don't configure `faktory_worker_ex` at all, it will autoconfigure
+  itself to connect to a Faktory server on `localhost` both client side and
+  worker side with sane defaults. You can call `Faktory.Configuration.all/0`
+  to see these defaults.
+
+  ### Client Configuration
+
+    Settings used for _enqueuing_ jobs.
+
+    ```elixir
+    config :faktory_worker_ex, FooConfig,
+      adapter: Faktory.Configuration.Client
+      host: "foo_faktory.mycompany.com",
+
+    config :faktory_worker_ex, BarConfig
+      adapter: Faktory.Configuration.Client
+      host: "bar_faktory.mycompany.com"
+    ```
+
+    Valid options:
+
+    * `host` - Host of Faktory server. Default `"localhost"`
+    * `port` - Port of Faktory server. Default `7419`
+    * `pool` - Connection pool size. Default `10`
+    * `middleware` - Middleware chain. Default `[]`
+    * `password` - For Faktory server authentication. Default `nil`
+    * `use_tls` - Connect to Faktory server using TLS. Default `false`
+
+  ### Default Client
+
+  The first configured client is the "default client" and is used by
+  `Faktory.Job.perform_async/2` when no client is specified.
+
   ```elixir
-  use Mix.Config
+  # No client is specified, default client is used.
+  MySuperJob.perform_async([1, 2, 3])
 
-  config :faktory_worker_ex,
-    host: "localhost",
-    port: 7419,
-    client: [
-      pool: 10,
-    ],
-    worker: [
-      concurrency: 20,
-      queues: ["default"],
-    ]
+  # Explicitly specify a client.
+  MyUltraJob.perform_async([1, 2, 3], client: BarConfig)
   ```
-
-  Notice that client/worker specific options will inherit from top level options
-  where applicable. In the above example, `client.host` will be `"localhost"`.
-
-  ### Options
-
-  * `host` - Faktory server host. Default `"localhost"`
-  * `port` - Faktory server port. Default `7419`
-  * `password` - Faktory server password. Default `nil`
-  * `config_fn` - Callback function for runtime config. Default `nil`
-
-  ### Client Options
-
-    * `pool` - Client connection pool size. Default `10`
-    * `middleware` - Client middleware chain. Default `[]`
 
   ### Worker Options
 
-    * `pool` - Worker connection pool size. Default `${concurrency}`
-    * `middleware` - Worker middleware chain. Default `[]`
-    * `concurrency` - How many worker processes to start. Default `20`
+    ```elixir
+    config :faktory_worker_ex, FooWorker,
+      adapter: Faktory.Configuration.Worker,
+      host: "foo_faktory.mycompany.com"
+
+    config :faktory_worker_ex, BarWorker,
+      adapter: Faktory.Configuration.Worker,
+      host: "bar_faktory.mycompany.com"
+    ```
+
+    Valid options:
+
+    * `host` - Host of Faktory server. Default `"localhost"`
+    * `port` - Port of Faktory server. Default `7419`
+    * `concurrency` - How many concurrent jobs to process. Default `20`
+    * `pool` - Connection pool size. Default `${concurrency}`
+    * `middleware` - Middleware chain. Default `[]`
     * `queues` - List of queues to fetch from. Default `["default"]`
 
   ### Runtime Configuration
 
-  You can specify a callback to do runtime configuration. For example, to read
-  host and port from environment variables.
+  There are two ways to do runtime configuration:
+  1. A special syntax to read environment vars
+  1. Using a callback function
 
+  Environment var without default value:
   ```elixir
-  config :faktory_worker_ex,
-    config_fn: &FaktoryConfig.call/1
-
-  defmodule FaktoryConfig do
-    def call(config) do
-      %{ config |
-         host: System.get_env("FAKTORY_HOST"),
-         port: System.get_env("FAKTORY_PORT") }
-    end
-  end
+  config :faktory_worker_ex, MyClient,
+    adapter: Faktory.Configuring.Client,
+    host: {:system, "FAKTORY_HOST"}
   ```
 
-  The function takes a config struct and returns a config struct.
-
-  ### Example
-
+  Environment var with default value:
   ```elixir
-  config :faktory_worker_ex,
-    host: "faktory.company.com",
-    client: [
-      pool: 5,
-      middleware: [Statsd]
-    ],
-    worker: [
-      concurrency: 10,
-      queues: ["priority01", "priority02", "priority03"]
-    ]
+  config :faktory_worker_ex, MyClient,
+    adapter: Faktory.Configuring.Client,
+    host: {:system, "FAKTORY_HOST", "localhost"}
+  ```
+
+  Using a callback:
+  ```elixir
+  config :faktory_worker_ex, MyClient,
+    adapter: Faktory.Configuring.Client,
+
+  defmodule MyClient do
+    use Faktory.Configuring.Client
+
+    def init(config) do
+      Keyword.put(config, :host, "faktory.company.com")
+    end
+  end
   ```
   """
 
-  def all do
-    Enum.map(modules(), fn module ->
-      {module, Map.delete(module.config, :module)}
-    end)
+  alias Faktory.{Configuration, Logger}
+  import Faktory, only: [get_env: 1, get_env: 2, put_env: 2, get_all_env: 0]
+
+  @doc false
+  def init do
+    put_env(:config_modules, [])
+
+    get_all_env()
+      |> Enum.each(fn {module, options} ->
+        case get_adapter(options) do
+          nil -> nil
+          adapter -> configure(module, adapter, options)
+        end
+      end)
+
+    if modules(:client) == [] do
+      Logger.info("No clients configured, autoconfiguring for localhost")
+      module = FaktoryDefaultClient
+      adapter = Configuration.Client
+      get_or_create_config_module(module, adapter)
+      configure(module, adapter, [adapter: adapter])
+    end
+
+    if modules(:worker) == [] && Faktory.start_workers? do
+      Logger.info("No workers configured, autoconfiguring for localhost")
+      module = FaktoryDefaultWorker
+      adapter = Configuration.Worker
+      get_or_create_config_module(module, adapter)
+      configure(module, adapter, [adapter: adapter])
+    end
+
+    # So that things like default_client/0 work properly.
+    modules = get_env(:config_modules) |> Enum.reverse
+    put_env(:config_modules, modules)
   end
 
-  # We allow for runtime configuration via environment variables and the init/1
-  # callback. Also, wid needs to be determined at runtime. Once that's all
-  # done, we memoize the config so the wid doesn't change and we don't waste
-  # cpu cycles recalculating the dynamic config.
-  @doc false
-  def config(module, defaults) do
-    import Application, only: [get_env: 2, put_env: 3]
-    import Faktory.Utils, only: [new_wid: 0]
+  @doc """
+  Return all configuration modules and their options.
 
-    memoized_key = {module, :memoized}
-
-    if get_env(:faktory_worker_ex, memoized_key) do
-      get_env(:faktory_worker_ex, module)
-    else
-      put_env(:faktory_worker_ex, memoized_key, true)
-      config = get_env(:faktory_worker_ex, module)
-      config = Keyword.merge(defaults, config)
-        |> Keyword.put(:wid, new_wid())
-        |> module.init
-        |> resolve_all_env_vars
-        |> Keyword.put(:module, module)
-        |> Keyword.put(:type, module.type)
-        |> Map.new
-      put_env(:faktory_worker_ex, module, config)
-      config
-    end
+  This is more or less a debugging function.
+  """
+  @spec all() :: [{module, map}]
+  def all do
+    Enum.map(modules(), & {&1, &1.config})
   end
 
   # Get all configuration modules. Gets both clients and workers.
   @doc false
   def modules do
-    Application.get_all_env(:faktory_worker_ex)
-      |> Enum.reduce([], fn {module, _}, acc ->
-        try do
-          module.config
-          module.client?
-          module.worker?
-          [module | acc]
-        rescue
-          UndefinedFunctionError -> acc
-        end
-      end)
-      |> Enum.reverse
+    get_env(:config_modules, [])
   end
 
   @doc false
   def modules(type) do
-    Enum.filter(modules, & &1.type == type)
+    Enum.filter(modules(), & &1.type == type)
   end
 
   # Return the default (first defined) client module.
@@ -145,9 +170,28 @@ defmodule Faktory.Configuration do
     Enum.find(modules(), & &1.client?) || raise Faktory.Error.NoClientsConfigured
   end
 
-  # Return true if the given module is a configuration module.
   @doc false
-  def exists?(module), do: !!Enum.find(modules(), & &1 == module)
+  def exists?(module) do
+    Enum.any?(modules(), & &1 == module)
+  end
+
+  defp configure(module, adapter, options) do
+    get_or_create_config_module(module, adapter)
+
+    config = adapter.defaults
+      |> Keyword.merge(options)
+      |> module.init
+      |> adapter.reconfig
+      |> resolve_all_env_vars
+      |> Keyword.put(:wid, Faktory.Utils.new_wid)
+      |> Keyword.put(:module, module)
+      |> Map.new
+
+    put_env(module, config)
+
+    modules = get_env(:config_modules)
+    put_env(:config_modules, [module | modules])
+  end
 
   defp resolve_all_env_vars(config) do
     Enum.map(config, fn {k, v} ->
@@ -161,8 +205,23 @@ defmodule Faktory.Configuration do
   end
 
   defp resolve_env_var(name, default \\ nil) do
-    name = to_string(name) |> String.upcase
-    System.get_env(name) || default
+    (name |> to_string |> System.get_env) || default
+  end
+
+  defp get_or_create_config_module(module, adapter) do
+    if !Code.ensure_loaded?(module) do
+      definition = quote do: use unquote(adapter)
+      defmodule module, do: Module.eval_quoted(__MODULE__, definition)
+    end
+    module
+  end
+
+  defp get_adapter(options) do
+    if Keyword.keyword?(options) do
+      options[:adapter]
+    else
+      nil
+    end
   end
 
 end

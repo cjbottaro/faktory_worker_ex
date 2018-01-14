@@ -12,8 +12,7 @@ defmodule Faktory.Configuration.Client do
     quote do
 
       def config do
-        alias Faktory.Configuration
-        Configuration.config(__MODULE__, Configuration.Client.defaults)
+        Faktory.get_env(__MODULE__)
       end
 
       def init(config), do: config
@@ -24,6 +23,10 @@ defmodule Faktory.Configuration.Client do
       def worker?, do: type() == :worker
 
     end
+  end
+
+  def reconfig(config) do
+    config
   end
 
 end

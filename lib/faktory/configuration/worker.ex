@@ -12,8 +12,7 @@ defmodule Faktory.Configuration.Worker do
     quote do
 
       def config do
-        alias Faktory.Configuration
-        Configuration.Worker.config(__MODULE__, Configuration.Worker.defaults)
+        Faktory.get_env(__MODULE__)
       end
 
       def init(config), do: config
@@ -26,9 +25,8 @@ defmodule Faktory.Configuration.Worker do
     end
   end
 
-  def config(module, defaults) do
-    config = Faktory.Configuration.config(module, defaults)
-    Map.put_new(config, :pool, config.concurrency)
+  def reconfig(config) do
+    Keyword.put_new(config, :pool, config[:concurrency])
   end
 
 end

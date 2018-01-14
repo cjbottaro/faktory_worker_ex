@@ -51,6 +51,7 @@ defmodule Faktory.Job do
 
   defmacro __using__(_options) do
     quote do
+      @behaviour Faktory.Job
       import Faktory.Job, only: [faktory_options: 1]
       @faktory_options [queue: "default", retry: 25, backtrace: 0, middleware: []]
       @before_compile Faktory.Job
@@ -69,6 +70,10 @@ defmodule Faktory.Job do
       end
     end
   end
+
+  @type job :: map
+
+  @callback perform_async(args :: [any], options :: Keyword.t) :: job
 
   @doc """
   Set default options for all jobs of this type.

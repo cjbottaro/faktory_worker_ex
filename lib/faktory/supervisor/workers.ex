@@ -23,7 +23,7 @@ defmodule Faktory.Supervisor.Workers do
       # the pools are ready. Consider rearranging the supervisor tree.
 
       [
-        pool_spec(config),
+        pool_spec(module, config),
         Supervisor.child_spec({Faktory.Heartbeat, config}, id: {module, :heartbeat})
       ]
       ++
@@ -31,17 +31,17 @@ defmodule Faktory.Supervisor.Workers do
         Supervisor.child_spec({Faktory.Worker, config}, id: {module, i})
       end)
 
-    end) |> IO.inspect
+    end)
   end
 
-  defp pool_spec(config) do
+  defp pool_spec(module, config) do
     pool_options = [
-      name: {:local, config.module},
+      name: {:local, module},
       worker_module: Faktory.Connection,
       size: config.pool,
       max_overflow: 0
     ]
-    :poolboy.child_spec(config.module, pool_options, config)
+    :poolboy.child_spec(module, pool_options, config)
   end
 
 end
