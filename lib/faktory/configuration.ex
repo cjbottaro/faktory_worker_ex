@@ -133,8 +133,8 @@ defmodule Faktory.Configuration do
 
     # TODO: Support the rest of the CLI options
     cli_options = Application.get_env(:faktory_worker_ex, :cli_options)
-    config = if use_tls = cli_options[:use_tls] do
-      config ++ [use_tls: use_tls]
+    config = if tls = cli_options[:tls] do
+      config ++ [use_tls: tls]
     else
       config
     end
