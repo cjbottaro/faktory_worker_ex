@@ -187,7 +187,6 @@ defmodule Faktory.Configuration do
       |> Keyword.put(:wid, Faktory.Utils.new_wid)
       |> Keyword.put(:module, module)
       |> Map.new
-      |> IO.inspect
 
     put_env(module, config)
 
