@@ -9,10 +9,9 @@ defmodule Faktory do
   # A connection to the Faktory server.
   @type conn :: pid
 
-  @app_name :faktory_worker_ex
-
   alias Faktory.{Logger, Protocol, Utils, Configuration}
 
+  defdelegate app_name, to: Utils
   defdelegate env, to: Utils
 
   @doc false
@@ -113,17 +112,17 @@ defmodule Faktory do
 
   @doc false
   def get_all_env do
-    Application.get_all_env(@app_name)
+    Application.get_all_env(app_name())
   end
 
   @doc false
   def get_env(key, default \\ nil) do
-     Application.get_env(@app_name, key, default)
+     Application.get_env(app_name(), key, default)
   end
 
   @doc false
   def put_env(key, value) do
-    Application.put_env(@app_name, key, value)
+    Application.put_env(app_name(), key, value)
   end
 
   @doc """
