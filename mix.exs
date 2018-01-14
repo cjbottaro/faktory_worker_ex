@@ -1,10 +1,12 @@
 defmodule Faktory.Mixfile do
   use Mix.Project
 
+  @version "0.5.0"
+
   def project do
     [
       app: :faktory_worker_ex,
-      version: "0.5.0",
+      version: @version,
       elixir: "~> 1.5",
       start_permanent: Mix.env == :prod,
       deps: deps(),
@@ -25,7 +27,8 @@ defmodule Faktory.Mixfile do
           "README.md": [title: "README"],
           "CHANGELOG.md": [title: "CHANGELOG"],
           "Architecture.md": [title: "Architecture"],
-        ]
+        ],
+        main: "README",
       ]
     ]
   end
