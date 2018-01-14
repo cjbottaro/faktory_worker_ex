@@ -22,9 +22,11 @@ defmodule Faktory.Connection do
   end
 
   def init(config) do
+    Map.get(config, :on_init, fn -> nil end).() # Aid testing.
+
     config
       |> Map.put(:socket, nil)
-      |> Map.put_new(:tcp, Faktory.Tcp.Real)
+      |> Map.put_new(:tcp, Faktory.Tcp)
       |> do_connect
   end
 
@@ -101,7 +103,7 @@ defmodule Faktory.Connection do
 
   defp handshake!(state) do
     alias Faktory.Utils
-    
+
     %{tcp: tcp, socket: socket, wid: wid, password: password} = state
 
     tcp.setup_size(socket, :line)

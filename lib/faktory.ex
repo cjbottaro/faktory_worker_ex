@@ -106,8 +106,8 @@ defmodule Faktory do
   end
 
   @doc false
-  def get_env(key) do
-     Application.get_env(app_name(), key)
+  def get_env(key, default \\ nil) do
+     Application.get_env(app_name(), key, default)
   end
 
   @doc false

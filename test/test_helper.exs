@@ -4,4 +4,5 @@ Faktory.flush
 Faktory.Configuration.fetch_all(:worker) |> Enum.each(fn config ->
   {:ok, _} = Faktory.Supervisor.Workers.start_link(config)
 end)
+Mox.defmock(Faktory.Tcp.Mock, for: Faktory.Tcp)
 ExUnit.start()
