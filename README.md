@@ -7,7 +7,6 @@ Elixir worker for Faktory ([blog](http://www.mikeperham.com/2017/10/24/introduci
 [faktory_worker_ex](https://hex.pm/packages/faktory_worker_ex) is available on
 [hex.pm](https://hex.pm).
 
-
 ## Configuration
 
 All configuration is optional with sane defaults and will connect to a
@@ -56,7 +55,7 @@ To run this readme's example, you need to run a Faktory server.
 
 Easiest way is with Docker:
 ```
-docker run --rm -it -p 7419:7419 -p 7420:7420 contribsys/faktory:latest -b 0.0.0.0:7419
+docker-compose up -d dev
 ```
 
 You should be able to go to [http://localhost:7420](http://localhost:7420) and see the web ui.
@@ -64,7 +63,6 @@ You should be able to go to [http://localhost:7420](http://localhost:7420) and s
 ## What's missing?
 
 * Responding to the terminate signal (from the Faktory server)
-* Tests
 
 ## Issues / Questions
 
