@@ -55,7 +55,7 @@ To run this readme's example, you need to run a Faktory server.
 
 Easiest way is with Docker:
 ```
-docker-compose up -d dev
+docker run --rm -p 7419:7419 -p 7420:7420 contribsys/faktory:latest -b :7419
 ```
 
 You should be able to go to [http://localhost:7420](http://localhost:7420) and see the web ui.
