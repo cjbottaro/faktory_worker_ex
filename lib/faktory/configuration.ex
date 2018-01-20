@@ -10,216 +10,230 @@ defmodule Faktory.Configuration do
 
   ### Defaults
 
+  If you don't configure `faktory_worker_ex` at all, it will autoconfigure
+  itself to connect to a Faktory server on `localhost` both client side and
+  worker side with sane defaults. You can call `Faktory.Configuration.all/0`
+  to see these defaults.
+
+  ### Client Configuration
+
+    Settings used for _enqueuing_ jobs.
+
+    ```elixir
+    config :faktory_worker_ex, FooConfig,
+      adapter: Faktory.Configuration.Client
+      host: "foo_faktory.mycompany.com",
+
+    config :faktory_worker_ex, BarConfig
+      adapter: Faktory.Configuration.Client
+      host: "bar_faktory.mycompany.com"
+    ```
+
+    Valid options:
+
+    * `host` - Host of Faktory server. Default `"localhost"`
+    * `port` - Port of Faktory server. Default `7419`
+    * `pool` - Connection pool size. Default `10`
+    * `middleware` - Middleware chain. Default `[]`
+    * `password` - For Faktory server authentication. Default `nil`
+    * `use_tls` - Connect to Faktory server using TLS. Default `false`
+
+  ### Default Client
+
+  The first configured client is the "default client" and is used by
+  `Faktory.Job.perform_async/2` when no client is specified.
+
   ```elixir
-  use Mix.Config
+  # No client is specified, default client is used.
+  MySuperJob.perform_async([1, 2, 3])
 
-  config :faktory_worker_ex,
-    host: "localhost",
-    port: 7419,
-    client: [
-      pool: 10,
-    ],
-    worker: [
-      concurrency: 20,
-      queues: ["default"],
-    ]
+  # Explicitly specify a client.
+  MyUltraJob.perform_async([1, 2, 3], client: BarConfig)
   ```
-
-  Notice that client/worker specific options will inherit from top level options
-  where applicable. In the above example, `client.host` will be `"localhost"`.
-
-  ### Options
-
-  * `host` - Faktory server host. Default `"localhost"`
-  * `port` - Faktory server port. Default `7419`
-  * `password` - Faktory server password. Default `nil`
-  * `config_fn` - Callback function for runtime config. Default `nil`
-
-  ### Client Options
-
-    * `pool` - Client connection pool size. Default `10`
-    * `middleware` - Client middleware chain. Default `[]`
 
   ### Worker Options
 
-    * `pool` - Worker connection pool size. Default `${concurrency}`
-    * `middleware` - Worker middleware chain. Default `[]`
-    * `concurrency` - How many worker processes to start. Default `20`
+    ```elixir
+    config :faktory_worker_ex, FooWorker,
+      adapter: Faktory.Configuration.Worker,
+      host: "foo_faktory.mycompany.com"
+
+    config :faktory_worker_ex, BarWorker,
+      adapter: Faktory.Configuration.Worker,
+      host: "bar_faktory.mycompany.com"
+    ```
+
+    Valid options:
+
+    * `host` - Host of Faktory server. Default `"localhost"`
+    * `port` - Port of Faktory server. Default `7419`
+    * `concurrency` - How many concurrent jobs to process. Default `20`
+    * `pool` - Connection pool size. Default `${concurrency}`
+    * `middleware` - Middleware chain. Default `[]`
     * `queues` - List of queues to fetch from. Default `["default"]`
 
   ### Runtime Configuration
 
-  You can specify a callback to do runtime configuration. For example, to read
-  host and port from environment variables.
+  There are two ways to do runtime configuration:
+  1. The conventional tuple syntax to read environment vars
+  1. Using a callback function
 
+  Environment var without default value:
   ```elixir
-  config :faktory_worker_ex,
-    config_fn: &FaktoryConfig.call/1
+  config :faktory_worker_ex, MyClient,
+    adapter: Faktory.Configuration.Client,
+    host: {:system, "FAKTORY_HOST"}
+  ```
 
-  defmodule FaktoryConfig do
-    def call(config) do
-      %{ config |
-         host: System.get_env("FAKTORY_HOST"),
-         port: System.get_env("FAKTORY_PORT") }
+  Environment var with default value:
+  ```elixir
+  config :faktory_worker_ex, MyClient,
+    adapter: Faktory.Configuration.Client,
+    host: {:system, "FAKTORY_HOST", "localhost"}
+  ```
+
+  Using a callback:
+  ```elixir
+  config :faktory_worker_ex, MyClient,
+    adapter: Faktory.Configuration.Client,
+
+  defmodule MyClient do
+    use Faktory.Configuration.Client
+
+    def init(config) do
+      Keyword.put(config, :host, "faktory.company.com")
     end
   end
   ```
-
-  The function takes a config struct and returns a config struct.
-
-  ### Example
-
-  ```elixir
-  config :faktory_worker_ex,
-    host: "faktory.company.com",
-    client: [
-      pool: 5,
-      middleware: [Statsd]
-    ],
-    worker: [
-      concurrency: 10,
-      queues: ["priority01", "priority02", "priority03"]
-    ]
-  ```
   """
 
-  alias Faktory.Utils
-  alias Faktory.Configuration.{Client, Worker}
+  alias Faktory.{Configuration, Logger}
+  import Faktory, only: [get_env: 1, get_env: 2, put_env: 2, get_all_env: 0]
 
   @doc false
   def init do
-    :ets.new(__MODULE__, [:set, :public, :named_table])
-    init(:clients)
-    init(:workers)
-  end
+    put_env(:config_modules, [])
 
-  @doc false
-  def init(:clients) do
-    if get_env(:client) && get_env(:clients) do
-      raise "configuration cannot have both :client and :clients"
-    end
-
-    raw_configs_for(:client)
-      |> Enum.each(fn {name, config} ->
-        config = resolve_config(Client, name, config)
-        :ets.insert(__MODULE__, {config.name, config})
+    get_all_env()
+      |> Enum.each(fn {module, options} ->
+        case get_adapter(options) do
+          nil -> nil
+          adapter -> configure(module, adapter, options)
+        end
       end)
+
+    if Enum.empty?(modules(:client)) do
+      Logger.info("No clients configured, autoconfiguring for localhost")
+      module = FaktoryDefaultClient
+      adapter = Configuration.Client
+      get_or_create_config_module(module, adapter)
+      configure(module, adapter, [adapter: adapter])
+    end
+
+    if Enum.empty?(modules(:worker)) && Faktory.start_workers? do
+      Logger.info("No workers configured, autoconfiguring for localhost")
+      module = FaktoryDefaultWorker
+      adapter = Configuration.Worker
+      get_or_create_config_module(module, adapter)
+      configure(module, adapter, [adapter: adapter])
+    end
+
+    # So that things like default_client/0 work properly.
+    modules = get_env(:config_modules) |> Enum.reverse
+    put_env(:config_modules, modules)
+  end
+
+  @doc """
+  Return all configuration modules and their options.
+
+  This is more or less a debugging function.
+  """
+  @spec all() :: [{module, map}]
+  def all do
+    Enum.map(modules(), & {&1, &1.config})
+  end
+
+  # Get all configuration modules. Gets both clients and workers.
+  @doc false
+  def modules do
+    get_env(:config_modules, [])
   end
 
   @doc false
-  def init(:workers) do
-    if get_env(:worker) && get_env(:workers) do
-      raise "configuration cannot have both :worker and :workers"
-    end
+  def modules(type) do
+    Enum.filter(modules(), & &1.type == type)
+  end
 
-    raw_configs_for(:worker)
-      |> Enum.each(fn {name, config} ->
-        config = resolve_config(Worker, name, config)
-        :ets.insert(__MODULE__, {config.name, config})
-      end)
+  # Return the default (first defined) client module.
+  @doc false
+  def default_client do
+    Enum.find(modules(), & &1.client?) || raise Faktory.Error.NoClientsConfigured
   end
 
   @doc false
-  def resolve_config(type, name, config) do
+  def exists?(module) do
+    Enum.any?(modules(), & &1 == module)
+  end
 
-    # Pull over top level options.
-    config = config
-      |> put_from_env(:host, :host)
-      |> put_from_env(:port, :port)
-      |> put_from_env(:password, :password)
-      |> put_from_env(:use_tls, :use_tls)
-      |> put_from_env(:fn, :config_fn)
-      |> Keyword.put(:name, name)
+  defp configure(module, adapter, options) do
+    get_or_create_config_module(module, adapter)
 
-    # TODO: Support the rest of the CLI options
-    cli_options = Application.get_env(:faktory_worker_ex, :cli_options)
-    config = if use_tls = cli_options[:use_tls] do
-      config ++ [use_tls: use_tls]
+    config = adapter.defaults
+      |> Keyword.merge(options)
+      |> module.init
+      |> handle_cli_options(module)
+      |> adapter.reconfig
+      |> resolve_all_env_vars
+      |> Keyword.put(:wid, Faktory.Utils.new_wid)
+      |> Keyword.put(:module, module)
+      |> Map.new
+
+    put_env(module, config)
+
+    modules = get_env(:config_modules)
+    put_env(:config_modules, [module | modules])
+  end
+
+  defp resolve_all_env_vars(config) do
+    Enum.map(config, fn {k, v} ->
+      v = case v do
+        {:system, name, default} -> resolve_env_var(name, default)
+        {:system, name} -> resolve_env_var(name)
+        v -> v
+      end
+      {k, v}
+    end)
+  end
+
+  defp resolve_env_var(name, default \\ nil) do
+    (name |> to_string |> System.get_env) || default
+  end
+
+  defp get_or_create_config_module(module, adapter) do
+    if !Code.ensure_loaded?(module) do
+      definition = quote do: use unquote(adapter)
+      defmodule module, do: Module.eval_quoted(__MODULE__, definition)
+    end
+    module
+  end
+
+  defp get_adapter(options) do
+    if Keyword.keyword?(options) do
+      options[:adapter]
     else
-      config
+      nil
     end
+  end
 
-    # Convert to struct.
-    config = struct!(type, config)
-
-    # Runtime configuration callback.
-    config = case config.fn do
-      nil -> config
-      f -> f.(config)
-    end
-
-    # Add proper name and wid.
-    config = %{config | name: name(type, name), wid: Utils.new_wid()}
-
-    # Maybe default :pool to :concurrency.
-    if type == Worker do
-      Utils.default_from_key(config, :pool, :concurrency)
+  defp handle_cli_options(options, module) do
+    if module.worker? do # CLI options only applicable to workers?
+      cli_options = get_env(:cli_options, [])
+      cli_options = cli_options
+        |> Faktory.Utils.put_unless_nil(:use_tls, cli_options[:tls])
+        |> Keyword.delete(:tls)
+      Keyword.merge(options, cli_options)
     else
-      config
-    end
-
-  end
-
-  defp name(type, name) do
-    case type do
-      Client -> "client/#{name}"
-      Worker -> "worker/#{name}"
-      _ -> "#{type}/#{name}"
-    end |> String.to_atom
-  end
-
-  @doc """
-  Get client or worker config.
-
-  Resolves all the values from Mix Config, runs any runtime config callbacks,
-  and returns a struct representing the config.
-  """
-  @spec fetch(:client | :worker, atom) :: struct
-  def fetch(type, name \\ :default) do
-    name = name(type, name)
-    [{_name, config}] = :ets.lookup(__MODULE__, name)
-    config
-  end
-
-  @doc """
-  Fetch all configuration.
-
-  Returns both client and worker configs.
-  """
-  @spec fetch_all :: [struct]
-  def fetch_all do
-    # Jeez that's some clunky syntax, Erlang.
-    :ets.match(__MODULE__, {:"_", :"$1"}) |> List.flatten
-  end
-
-  @doc """
-  Fetch client or worker configs.
-  """
-  @spec fetch_all(:client | :worker) :: [struct]
-  def fetch_all(type) do
-    type = case type do
-      :client -> Client
-      :worker -> Worker
-      _ -> type
-    end
-
-    Enum.filter(fetch_all(), & &1.__struct__ == type)
-  end
-
-  defp get_env(key) do
-    Application.get_env(Faktory.app_name(), key)
-  end
-
-  defp put_from_env(enum, dst, src) do
-    Utils.put_unless_nil(enum, dst, get_env(src))
-  end
-
-  defp raw_configs_for(type) do
-    plural = "#{type}s" |> String.to_atom
-
-    case get_env(type) do
-      nil -> get_env(plural) || [{:default, []}]
-      config -> [{:default, config}]
+      options
     end
   end
 

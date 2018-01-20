@@ -21,8 +21,8 @@ defmodule Mix.Tasks.Faktory do
   @doc false
   def run(args) do
     OptionParser.parse(args,
-      strict: [concurrency: :integer, queues: :string, pool: :integer, use_tls: :boolean],
-      aliases: [c: :concurrency, q: :queues, p: :pool, t: :use_tls, tls: :use_tls]
+      strict: [concurrency: :integer, queues: :string, pool: :integer, tls: :boolean],
+      aliases: [c: :concurrency, q: :queues, p: :pool, t: :tls]
     ) |> case do
       {options, [], []} -> start(options)
       _ ->

@@ -39,40 +39,27 @@ defmodule Faktory.Job do
   end
   ```
 
-  ### Runtime configuration
+  ### Runtime overrides
 
-  You can alter the aspects of a singular job at runtime in a couple of ways.
-
-  ```elixir
-  MyFunkyJob.set(queue: "not_default") |> MyFunkyJob.perform_async([1, "foo"])
-  ```
-
-  That chaining syntax as inspired by the Ruby Faktory Worker and I'm not sure
-  if it's a good fit. You can just set options directly in the call to `perform_async`:
+  You can override `faktory_options` when enqueuing a job.
 
   ```elixir
-  MyFunkyJob.perform_async([queue: "not_default"], [1, "foo"])
+  MyFunkyJob.perform_async([1, "foo"], queue: "not_default")
+  MyFunkyJob.perform_async([2, "bar"], retry: 0)
   ```
   """
 
   defmacro __using__(_options) do
     quote do
+      @behaviour Faktory.Job
       import Faktory.Job, only: [faktory_options: 1]
       @faktory_options [queue: "default", retry: 25, backtrace: 0, middleware: []]
       @before_compile Faktory.Job
 
-      def perform_async(args) do
-        perform_async([], args)
-      end
-
-      def perform_async(options, args) do
+      def perform_async(args, options \\ []) do
         Faktory.push(__MODULE__, args, options)
       end
 
-      def set(options), do: options
-      def set(options, new_options) do
-        Keyword.merge(options, new_options)
-      end
     end
   end
 
@@ -83,6 +70,10 @@ defmodule Faktory.Job do
       end
     end
   end
+
+  @type job :: map
+
+  @callback perform_async(args :: [any], options :: Keyword.t) :: job
 
   @doc """
   Set default options for all jobs of this type.
