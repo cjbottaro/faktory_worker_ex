@@ -75,30 +75,30 @@ defmodule Faktory.Configuration do
   ### Runtime Configuration
 
   There are two ways to do runtime configuration:
-  1. A special syntax to read environment vars
+  1. The conventional tuple syntax to read environment vars
   1. Using a callback function
 
   Environment var without default value:
   ```elixir
   config :faktory_worker_ex, MyClient,
-    adapter: Faktory.Configuring.Client,
+    adapter: Faktory.Configuration.Client,
     host: {:system, "FAKTORY_HOST"}
   ```
 
   Environment var with default value:
   ```elixir
   config :faktory_worker_ex, MyClient,
-    adapter: Faktory.Configuring.Client,
+    adapter: Faktory.Configuration.Client,
     host: {:system, "FAKTORY_HOST", "localhost"}
   ```
 
   Using a callback:
   ```elixir
   config :faktory_worker_ex, MyClient,
-    adapter: Faktory.Configuring.Client,
+    adapter: Faktory.Configuration.Client,
 
   defmodule MyClient do
-    use Faktory.Configuring.Client
+    use Faktory.Configuration.Client
 
     def init(config) do
       Keyword.put(config, :host, "faktory.company.com")
@@ -122,7 +122,7 @@ defmodule Faktory.Configuration do
         end
       end)
 
-    if modules(:client) == [] do
+    if Enum.empty?(modules(:client)) do
       Logger.info("No clients configured, autoconfiguring for localhost")
       module = FaktoryDefaultClient
       adapter = Configuration.Client
@@ -130,7 +130,7 @@ defmodule Faktory.Configuration do
       configure(module, adapter, [adapter: adapter])
     end
 
-    if modules(:worker) == [] && Faktory.start_workers? do
+    if Enum.empty?(modules(:worker)) && Faktory.start_workers? do
       Logger.info("No workers configured, autoconfiguring for localhost")
       module = FaktoryDefaultWorker
       adapter = Configuration.Worker
