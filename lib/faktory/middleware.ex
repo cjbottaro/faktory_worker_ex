@@ -42,10 +42,9 @@ defmodule Faktory.Middleware do
   Next add it to the worker configuration.
 
   ```elixir
-  config :faktory_worker_ex,
-    worker: [
-      middleware: [JobTimer]
-    ]
+  config :faktory_worker_ex, MyWorkerConfig,
+    adapter: Faktory.Configuration.Worker,
+    middleware: [JobTimer]
   ```
 
   Super contrived because we don't actually need to alter the job to time it.
