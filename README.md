@@ -65,6 +65,8 @@ You should be able to go to [http://localhost:7420](http://localhost:7420) and s
 * Middleware
 * Connection pooling
 * Support for multiple Faktory servers
+* Faktory server authentication and TLS support
+* Comprehensive documentation
 * Comprehensive supervision tree
 * Decent integration tests
 
