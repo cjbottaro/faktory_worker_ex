@@ -1,4 +1,6 @@
 defmodule Faktory.Tcp.Mock do
+  @moduledoc false
+  
   defstruct [line_mode: false, recv_buf: "", send_buf: ""]
 
   def connect(options), do: {:ok, options.mock_pid}

@@ -1,4 +1,6 @@
 defmodule Faktory.Tcp.Real do
+  @moduledoc false
+  
   defstruct [:transport, :socket]
 
   @default_timeout 4000
