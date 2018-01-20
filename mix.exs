@@ -24,11 +24,11 @@ defmodule Faktory.Mixfile do
       # Docs
       docs: [
         extras: [
-          "README.md": [title: "README"],
+          "README.md": [title: "README", name: "readme"],
           "CHANGELOG.md": [title: "CHANGELOG"],
           "Architecture.md": [title: "Architecture"],
         ],
-        main: "README",
+        main: "readme",
       ]
     ]
   end
