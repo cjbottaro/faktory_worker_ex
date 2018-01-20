@@ -7,7 +7,7 @@ defmodule Faktory.Mixfile do
     [
       app: :faktory_worker_ex,
       version: @version,
-      elixir: "~> 1.5",
+      elixir: ">= 1.5.0",
       start_permanent: Mix.env == :prod,
       deps: deps(),
       elixirc_paths: elixirc_paths(Mix.env),
