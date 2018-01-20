@@ -4,4 +4,6 @@ Faktory.flush
 {:ok, _} = Faktory.Configuration.modules(:worker)
   |> Faktory.Supervisor.Workers.start_link
 
+Mox.defmock(Faktory.Tcp.Mock, for: Faktory.Tcp)
+
 ExUnit.start()

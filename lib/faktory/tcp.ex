@@ -1,7 +1,16 @@
-defmodule Faktory.Tcp.Real do
+defmodule Faktory.Tcp do
   @moduledoc false
-  
+
   defstruct [:transport, :socket]
+
+  @type tcp_struct :: %__MODULE__{}
+
+  @callback connect(options :: Keyword.t) :: tcp_struct
+  @callback close(tcp_struct) :: :ok
+  @callback setup_size(tcp_struct, size :: :line | integer) :: 0 | integer
+  @callback send(tcp_struct, data :: binary) :: :ok | {:error, reason :: term}
+  @callback recv(tcp_struct, size :: integer) :: {:ok, data :: binary} | {:error, reason :: term}
+  @callback recv(tcp_struct, size :: integer, timeout :: integer) :: {:ok, data :: binary} | {:error, reason :: term}
 
   @default_timeout 4000
 
