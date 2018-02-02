@@ -14,7 +14,7 @@ defmodule Faktory.Mixfile do
       aliases: aliases(),
 
       # Hex
-      description: "Elixir worker for Faktory",
+      description: "Elixir worker for Faktory (successor of Sidekiq); async/background queue processing",
       package: [
         maintainers: ["Christopher J. Bottaro"],
         licenses: ["GNU General Public License v3.0"],
