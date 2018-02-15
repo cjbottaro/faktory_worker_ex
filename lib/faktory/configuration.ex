@@ -184,6 +184,7 @@ defmodule Faktory.Configuration do
       |> handle_cli_options(module)
       |> adapter.reconfig
       |> resolve_all_env_vars
+      |> typecast
       |> Keyword.put(:wid, Faktory.Utils.new_wid)
       |> Keyword.put(:module, module)
       |> Map.new
@@ -236,5 +237,19 @@ defmodule Faktory.Configuration do
       options
     end
   end
+
+  defp typecast(options) do
+    Enum.map options, fn {k, v} ->
+      v = case k do
+        :port -> to_integer(v)
+        :pool -> to_integer(v)
+        :concurrency -> to_integer(v)
+        _ -> v
+      end
+      {k, v}
+    end
+  end
+
+  defp to_integer(v), do: to_string(v) |> String.to_integer
 
 end

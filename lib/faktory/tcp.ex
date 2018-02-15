@@ -23,7 +23,6 @@ defmodule Faktory.Tcp do
       %__MODULE__{transport: :gen_tcp}
     end
 
-    port = port |> to_string |> String.to_integer
     host = String.to_charlist(host)
     tcp_opts = tcp_opts(options)
     timeout = Map.get(options, :timeout, @default_timeout)
