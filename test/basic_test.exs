@@ -1,5 +1,5 @@
 defmodule BasicTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: false
 
   test "enqueing and processing a job" do
     job = AddWorker.perform_async([PidMap.register, 1, 2])

@@ -15,7 +15,7 @@ defmodule Faktory.Executor do
     try do
       perform(job, middleware) # Eventually calls dispatch.
     rescue
-      error -> handle_error(error, worker)
+      error -> handle_error(System.stacktrace, error, worker)
     end
 
     {:stop, :normal, nil}
@@ -29,10 +29,10 @@ defmodule Faktory.Executor do
     end)
   end
 
-  defp handle_error(error, worker) do
+  defp handle_error(trace, error, worker) do
     errtype = Utils.module_name(error.__struct__)
     message = Exception.message(error)
-    trace = Exception.format_stacktrace(System.stacktrace)
+    trace = Exception.format_stacktrace(trace)
     error = {errtype, message, trace}
     :ok = GenServer.call(worker, {:error_report, error})
   end
