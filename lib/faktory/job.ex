@@ -53,7 +53,13 @@ defmodule Faktory.Job do
     quote do
       @behaviour Faktory.Job
       import Faktory.Job, only: [faktory_options: 1]
-      @faktory_options [queue: "default", retry: 25, backtrace: 0, middleware: []]
+      @faktory_options [
+        queue: "default",
+        jobtype: Faktory.Utils.module_name(__MODULE__),
+        retry: 25,
+        backtrace: 0,
+        middleware: []
+      ]
       @before_compile Faktory.Job
 
       def perform_async(args, options \\ []) do
@@ -73,7 +79,30 @@ defmodule Faktory.Job do
 
   @type job :: map
 
-  @callback perform_async(args :: [any], options :: Keyword.t) :: job
+  @doc """
+  Returns the default options for a given job module.
+
+  Examples:
+  ```
+  MyJob.faktory_options
+  ```
+  """
+  @callback faktory_options() :: options :: Keyword.t
+
+  @doc """
+  Enqueue a job.
+
+  `options` can override any options specified by `faktory_options/1`.
+  For all valid options, see `c:faktory_options/0`.
+
+  Examples:
+  ```
+  job_args = [123, "abc"]
+  MyJob.perform_async(job_args)
+  MyJob.perform_async(job_args, queue: "not_default" jobtype: "Worker::MyJob")
+  ```
+  """
+  @callback perform_async(args :: [any], options :: Keyword.t | []) :: job
 
   @doc """
   Set default options for all jobs of this type.
@@ -81,10 +110,11 @@ defmodule Faktory.Job do
   ## Options
 
     * `:queue` - Name of queue. Default `"default"`
+    * `:jobtype` - Defaults to module name as a string.
     * `:retry` - How many times to retry. Default `25`
     * `:backtrace` - How many lines of backtrace to store if the job errors. Default `0`
   """
-  @spec faktory_options(Keyword.t) :: nil
+  @spec faktory_options(Keyword.t) :: term
   defmacro faktory_options(options) do
     quote do
       options = unquote(options)

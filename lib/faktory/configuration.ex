@@ -41,7 +41,7 @@ defmodule Faktory.Configuration do
   ### Default Client
 
   The first configured client is the "default client" and is used by
-  `Faktory.Job.perform_async/2` when no client is specified.
+  `c:Faktory.Job.perform_async/2` when no client is specified.
 
   ```elixir
   # No client is specified, default client is used.
