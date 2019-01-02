@@ -41,7 +41,7 @@ defmodule Faktory.Worker do
     child_spec(module, options, Faktory.start_workers?)
   end
 
-  def child_spec(module, options, false) do
+  def child_spec(module, _options, false) do
     children = []
     args = [
       children,
@@ -54,7 +54,7 @@ defmodule Faktory.Worker do
     }
   end
 
-  def child_spec(module, options, true) do
+  def child_spec(module, _options, true) do
     children = (0..module.config[:concurrency]-1)
     |> Enum.map(fn index ->
       %{

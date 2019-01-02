@@ -72,6 +72,8 @@ defmodule Faktory.Processor do
     {errtype, message, backtrace} = case reason do
       {reason, trace} when is_tuple(reason) ->
         {inspect(reason), "", inspect(trace)}
+      {%{__struct__: errtype}, trace} ->
+        {inspect(errtype), "", inspect(trace)}
     end
 
     Logger.debug("Worker stopped #{errtype}")
