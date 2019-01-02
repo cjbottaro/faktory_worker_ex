@@ -107,95 +107,27 @@ defmodule Faktory.Configuration do
   ```
   """
 
-  alias Faktory.{Configuration, Logger}
-  import Faktory, only: [get_env: 1, get_env: 2, put_env: 2, get_all_env: 0]
-
-  @doc false
-  def init do
-    put_env(:config_modules, [])
-
-    get_all_env()
-      |> Enum.each(fn {module, options} ->
-        case get_adapter(options) do
-          nil -> nil
-          adapter -> configure(module, adapter, options)
-        end
-      end)
-
-    if Enum.empty?(modules(:client)) do
-      Logger.info("No clients configured, autoconfiguring for localhost")
-      module = FaktoryDefaultClient
-      adapter = Configuration.Client
-      get_or_create_config_module(module, adapter)
-      configure(module, adapter, [adapter: adapter])
-    end
-
-    if Enum.empty?(modules(:worker)) && Faktory.start_workers? do
-      Logger.info("No workers configured, autoconfiguring for localhost")
-      module = FaktoryDefaultWorker
-      adapter = Configuration.Worker
-      get_or_create_config_module(module, adapter)
-      configure(module, adapter, [adapter: adapter])
-    end
-
-    # So that things like default_client/0 work properly.
-    modules = get_env(:config_modules) |> Enum.reverse
-    put_env(:config_modules, modules)
-  end
-
-  @doc """
-  Return all configuration modules and their options.
-
-  This is more or less a debugging function.
-  """
-  @spec all() :: [{module, map}]
-  def all do
-    Enum.map(modules(), & {&1, &1.config})
-  end
-
-  # Get all configuration modules. Gets both clients and workers.
-  @doc false
-  def modules do
-    get_env(:config_modules, [])
-  end
-
-  @doc false
-  def modules(type) do
-    Enum.filter(modules(), & &1.type == type)
-  end
-
-  # Return the default (first defined) client module.
-  @doc false
-  def default_client do
-    Enum.find(modules(), & &1.client?) || raise Faktory.Error.NoClientsConfigured
-  end
-
-  @doc false
-  def exists?(module) do
-    Enum.any?(modules(), & &1 == module)
-  end
-
-  defp configure(module, adapter, options) do
-    get_or_create_config_module(module, adapter)
-
-    config = adapter.defaults
-      |> Keyword.merge(options)
+  def call(module, defaults) do
+    config = Application.get_env(module.otp_app, module, [])
+    if config[:configured] do
+      Keyword.delete(config, :configured)
+    else
+      config = defaults
+      |> Keyword.merge(config)
       |> module.init
-      |> handle_cli_options(module)
-      |> adapter.reconfig
+      |> put_wid(module.type) # Client connection don't have wid.
       |> resolve_all_env_vars
-      |> typecast
-      |> Keyword.put(:wid, Faktory.Utils.new_wid)
-      |> Keyword.put(:module, module)
-      |> Map.new
-
-    put_env(module, config)
-
-    modules = get_env(:config_modules)
-    put_env(:config_modules, [module | modules])
+      |> normalize
+      |> Keyword.put(:configured, true)
+      Application.put_env(module.otp_app, module, config)
+      call(module, defaults)
+    end
   end
 
-  defp resolve_all_env_vars(config) do
+  defp put_wid(config, :worker), do: Keyword.put(config, :wid, Faktory.Utils.new_wid)
+  defp put_wid(config, :client), do: config
+
+  def resolve_all_env_vars(config) do
     Enum.map(config, fn {k, v} ->
       v = case v do
         {:system, name, default} -> resolve_env_var(name, default)
@@ -210,46 +142,14 @@ defmodule Faktory.Configuration do
     (name |> to_string |> System.get_env) || default
   end
 
-  defp get_or_create_config_module(module, adapter) do
-    if !Code.ensure_loaded?(module) do
-      definition = quote do: use unquote(adapter)
-      defmodule module, do: Module.eval_quoted(__MODULE__, definition)
-    end
-    module
-  end
-
-  defp get_adapter(options) do
-    if Keyword.keyword?(options) do
-      options[:adapter]
-    else
-      nil
+  def normalize(config) do
+    case config[:port] do
+      port when is_binary(port) ->
+        port = String.to_integer(port)
+        Keyword.put(config, :port, port)
+      port when is_integer(port) ->
+        config
     end
   end
-
-  defp handle_cli_options(options, module) do
-    if module.worker? do # CLI options only applicable to workers?
-      cli_options = get_env(:cli_options, [])
-      cli_options = cli_options
-        |> Faktory.Utils.put_unless_nil(:use_tls, cli_options[:tls])
-        |> Keyword.delete(:tls)
-      Keyword.merge(options, cli_options)
-    else
-      options
-    end
-  end
-
-  defp typecast(options) do
-    Enum.map options, fn {k, v} ->
-      v = case k do
-        :port -> to_integer(v)
-        :pool -> to_integer(v)
-        :concurrency -> to_integer(v)
-        _ -> v
-      end
-      {k, v}
-    end
-  end
-
-  defp to_integer(v), do: to_string(v) |> String.to_integer
 
 end

@@ -9,25 +9,27 @@ defmodule Faktory.Heartbeat do
   end
 
   def init(config) do
-    %{module: pool, wid: wid} = config
+    config = Map.new(config)
 
-    # Make sure we beat at least once before starting the workers.
-    beat(pool, wid)
+    {:ok, conn} = Faktory.Connection.start_link(config)
+
+    # # Make sure we beat at least once before starting the workers.
+    # beat(conn, config.wid)
 
     # Start the timer.
     Process.send_after(self(), :beat, 15_000) # 15 seconds
 
-    {:ok, {pool, wid}}
+    {:ok, {conn, config.wid}}
   end
 
-  def handle_info(:beat, {pool, wid}) do
-    beat(pool, wid)
+  def handle_info(:beat, {conn, wid}) do
+    beat(conn, wid)
     Process.send_after(self(), :beat, 15_000) # 15 seconds
-    {:noreply, {pool, wid}}
+    {:noreply, {conn, wid}}
   end
 
-  defp beat(pool, wid) do
-    case :poolboy.transaction(pool, &Protocol.beat(&1, wid)) do
+  defp beat(conn, wid) do
+    case Protocol.beat(conn, wid) do
       :ok -> Logger.debug("wid-#{wid} Heartbeat ok")
       {:ok, signal} -> Logger.debug("wid-#{wid} Heartbeat #{signal}")
       {:error, reason} -> Logger.warn("wid-#{wid} Heartbeat ERROR: #{stringify(reason)}")

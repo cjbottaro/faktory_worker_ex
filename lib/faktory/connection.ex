@@ -22,12 +22,15 @@ defmodule Faktory.Connection do
   end
 
   def init(config) do
-    Map.get(config, :on_init, fn -> nil end).() # Aid testing.
+    config = Map.new(config)
+
+    # Aid testing.
+    Map.get(config, :on_init, fn -> nil end).()
 
     config
-      |> Map.put(:socket, nil)
-      |> Map.put_new(:tcp, Faktory.Tcp)
-      |> do_connect
+    |> Map.put(:socket, nil)
+    |> Map.put_new(:tcp, Faktory.Tcp)
+    |> do_connect
   end
 
   def connect(:backoff, state), do: do_connect(state)
@@ -104,7 +107,7 @@ defmodule Faktory.Connection do
   defp handshake!(state) do
     alias Faktory.Utils
 
-    %{tcp: tcp, socket: socket, wid: wid, password: password} = state
+    %{tcp: tcp, socket: socket, password: password} = state
 
     tcp.setup_size(socket, :line)
     {:ok, <<"+HI", rest::binary>>} = tcp.recv(socket, 0)
@@ -117,18 +120,21 @@ defmodule Faktory.Connection do
     end
 
     payload = %{
-      wid: wid,
       hostname: Utils.hostname,
       pid: Utils.unix_pid,
       labels: ["elixir"],
       v: 2,
     }
+    |> add_wid(state) # Client connection don't have wid
     |> Map.merge(password_opts(password, server_config))
     |> Poison.encode!
 
     :ok = tcp.send(socket, "HELLO #{payload}\r\n")
     {:ok, "+OK\r\n"} = tcp.recv(socket, 0)
   end
+
+  defp add_wid(payload, %{wid: wid}), do: Map.put(payload, :wid, wid)
+  defp add_wid(payload, _), do: payload
 
   defp password_opts(nil, %{"s" => _salt}), do: raise "This server requires a password, but a password hasn't been configured"
 

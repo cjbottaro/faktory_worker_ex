@@ -1,24 +1,12 @@
 defmodule Faktory.Executor do
-  @moduledoc false
-  use GenServer
   alias Faktory.{Logger, Utils, Middleware}
 
-  def start_link(worker, middleware) do
-    GenServer.start_link(__MODULE__, {worker, middleware})
-  end
-
-  def init(state) do
-    {:ok, state}
-  end
-
-  def handle_cast({:run, job}, {worker, middleware}) do
+  def run(processor, job, middleware) do
     try do
-      perform(job, middleware) # Eventually calls dispatch.
+      perform(job, middleware)
     rescue
-      error -> handle_error(System.stacktrace, error, worker)
+      error -> handle_error(System.stacktrace, error, processor)
     end
-
-    {:stop, :normal, nil}
   end
 
   defp perform(job, middleware) do

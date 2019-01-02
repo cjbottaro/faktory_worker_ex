@@ -41,7 +41,9 @@ defmodule Mix.Tasks.Faktory do
     # Easy enough.
     Mix.Task.run "app.start"
 
-    shh_just_go_to_sleep()
+    if ! IEx.started? do
+      Process.sleep(:infinity)
+    end
   end
 
   defp print_usage do
@@ -53,14 +55,6 @@ defmodule Mix.Tasks.Faktory do
     -p, --pool         Connection pool size. Default: <concurrency>
     -t, --tls          Enable TLS when connecting to Faktory server. Default: disable TLS
     """
-  end
-
-  defp shh_just_go_to_sleep do
-    receive do
-      something ->
-        Logger.warn("!!! Uh oh, main process received a message: #{inspect(something)}")
-    end
-    shh_just_go_to_sleep()
   end
 
 end
