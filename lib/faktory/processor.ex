@@ -67,36 +67,18 @@ defmodule Faktory.Processor do
   end
 
   def handle_info({:DOWN, _ref, :process, pid, reason}, %{executor_pid: executor_pid} = state)
-  when pid == executor_pid do
+  when pid == executor_pid and is_tuple(reason) do
+    Logger.debug("Worker stopped :exit")
 
-    {errtype, message, backtrace} = case reason do
-      {reason, trace} when is_tuple(reason) ->
-        {inspect(reason), "", inspect(trace)}
-      {%{__struct__: errtype}, trace} ->
-        {inspect(errtype), "", inspect(trace)}
-    end
+    # reason is some Erlang tuple. Luckily, Elixir gives us some functions to
+    # format it into an exception with trace. Unfortunately, it's a string and
+    # we have to parse it into {errtype, message, trace}.
+    error = Exception.format_exit(reason) |> parse_format_exit
 
-    Logger.debug("Worker stopped #{errtype}")
-
-    report_fail(%{state | error: {errtype, message, backtrace}})
+    report_fail(%{state | error: error})
 
     {:noreply, next(state)}
   end
-
-  # Is this relevant anymore?
-  # def handle_info({:EXIT, pid, reason}, %{executor_pid: executor_pid} = state)
-  # when pid == executor_pid do
-  #   Logger.debug("Worker stopped :exit")
-  #
-  #   # reason is some Erlang tuple. Luckily, Elixir gives us some functions to
-  #   # format it into an exception with trace. Unfortunately, it's a string and
-  #   # we have to parse it into {errtype, message, trace}.
-  #   error = Exception.format_exit(reason) |> parse_format_exit
-  #
-  #   report_fail(%{state | error: error})
-  #
-  #   {:noreply, next(state)}
-  # end
 
   # Either update state.job to be a map, or nil if no job was available.
   def fetch(%{conn: conn, queues: queues} = state) do
