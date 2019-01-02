@@ -57,6 +57,7 @@ defmodule Faktory.Processor do
     {:noreply, next(state)}
   end
 
+  # This is what happens when you say Process.exit(some_pid, :kill).
   def handle_info({:DOWN, _ref, :process, pid, :killed}, %{executor_pid: executor_pid} = state)
   when pid == executor_pid do
     Logger.debug("Worker stopped :killed")
@@ -66,6 +67,7 @@ defmodule Faktory.Processor do
     {:noreply, next(state)}
   end
 
+  # This is what happens when a linked process raises an exception.
   def handle_info({:DOWN, _ref, :process, pid, reason}, %{executor_pid: executor_pid} = state)
   when pid == executor_pid and is_tuple(reason) do
     Logger.debug("Worker stopped :exit")
