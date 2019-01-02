@@ -41,8 +41,8 @@ defmodule Mix.Tasks.Faktory do
     # Easy enough.
     Mix.Task.run "app.start"
 
-    # --no-halt unless in running in IEx.
-    IEx.started? || Process.sleep(:infinity)
+    # Do the equivalent of --no-halt unless in running in IEx.
+    unless IEx.started?, do: Process.sleep(:infinity)
   end
 
   defp print_usage do
