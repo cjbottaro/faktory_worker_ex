@@ -9,4 +9,5 @@ Faktory.flush
 {:ok, _} = PidMap.start_link
 {:ok, _} = TestJidPidMap.start_link
 
+ExUnit.configure(exclude: [pending: true])
 ExUnit.start()
