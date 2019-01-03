@@ -115,7 +115,7 @@ defmodule Faktory.Protocol do
 
   defp rx(conn, size) when is_binary(size) do
     size = String.to_integer(size)
-    rx(conn, size)
+    rx(conn, size) |> IO.inspect
   end
 
   defp rx(_conn, size) when size == -1, do: {:ok, nil}

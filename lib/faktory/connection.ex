@@ -29,7 +29,6 @@ defmodule Faktory.Connection do
 
     config
     |> Map.put(:socket, nil)
-    |> Map.put_new(:tcp, Faktory.Tcp)
     |> do_connect
   end
 
@@ -37,10 +36,10 @@ defmodule Faktory.Connection do
 
   def disconnect(info, state) do
     # Pull out variables.
-    %{tcp: tcp, socket: socket, host: host, port: port} = state
+    %{socket: socket, host: host, port: port} = state
 
     # Close the damn thing.
-    :ok = tcp.close(socket)
+    :ok = Socket.close(socket)
 
     case info do
       # Terminate normally.
@@ -67,19 +66,26 @@ defmodule Faktory.Connection do
     {:disconnect, {:close, from}, state}
   end
 
-  def handle_call({:send, data}, _from, %{tcp: tcp, socket: socket} = state) do
-    case tcp.send(socket, data) do
+  def handle_call({:send, data}, _from, %{socket: socket} = state) do
+    case Socket.Stream.send(socket, data) do
       :ok -> {:reply, :ok, state}
       {:error, _} = error -> {:disconnect, error, error, state}
     end
   end
 
-  def handle_call({:recv, size}, _, %{tcp: tcp, socket: socket} = state) do
-    size = tcp.setup_size(socket, size)
+  def handle_call({:recv, size}, _, %{socket: socket} = state) do
+    response = case size do
+      :line ->
+        Socket.packet!(socket, :line)
+        Socket.Stream.recv(socket, timeout: @default_timeout)
+      size ->
+        Socket.packet!(socket, :raw)
+        Socket.Stream.recv(socket, size, timeout: @default_timeout)
+    end
 
-    case tcp.recv(socket, size, @default_timeout) do
+    case response do
       {:ok, data} ->
-        data = cleanup_data(data, size)
+        data = cleanup_data(data, size) |> IO.inspect
         {:reply, {:ok, data}, state}
       {:error, :timeout} = timeout ->
         {:reply, timeout, state}
@@ -89,9 +95,14 @@ defmodule Faktory.Connection do
   end
 
   defp do_connect(state) do
-    %{host: host, port: port, tcp: tcp} = state
+    %{host: host, port: port} = state
 
-    case tcp.connect(state) do
+    uri = case state.use_tls do
+      false -> "tcp://#{host}:#{port}"
+      true -> "ssl://#{host}:#{port}"
+    end
+
+    case Socket.connect(uri) do
       {:ok, socket} ->
         state = %{state | socket: socket}
         handshake!(state)
@@ -107,10 +118,10 @@ defmodule Faktory.Connection do
   defp handshake!(state) do
     alias Faktory.Utils
 
-    %{tcp: tcp, socket: socket, password: password} = state
+    %{socket: socket, password: password} = state
 
-    tcp.setup_size(socket, :line)
-    {:ok, <<"+HI", rest::binary>>} = tcp.recv(socket, 0)
+    Socket.packet!(socket, :line)
+    {:ok, <<"+HI", rest::binary>>} = Socket.Stream.recv(socket)
 
     server_config = Poison.decode!(rest)
     server_version = server_config["v"]
@@ -129,8 +140,8 @@ defmodule Faktory.Connection do
     |> Map.merge(password_opts(password, server_config))
     |> Poison.encode!
 
-    :ok = tcp.send(socket, "HELLO #{payload}\r\n")
-    {:ok, "+OK\r\n"} = tcp.recv(socket, 0)
+    :ok = Socket.Stream.send(socket, "HELLO #{payload}\r\n")
+    {:ok, "+OK\r\n"} = Socket.Stream.recv(socket)
   end
 
   defp add_wid(payload, %{wid: wid}), do: Map.put(payload, :wid, wid)
@@ -144,8 +155,8 @@ defmodule Faktory.Connection do
 
   defp password_opts(_password, _server_config), do: %{}
 
-  # If size is 0, then we requested a whole line, so we chomp it.
-  defp cleanup_data(data, 0), do: String.replace_suffix(data, "\r\n", "")
+  # If size is :line, then we requested a whole line, so we chomp it.
+  defp cleanup_data(data, :line), do: String.replace_suffix(data, "\r\n", "")
   defp cleanup_data(data, _), do: data
 
 end

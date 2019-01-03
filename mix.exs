@@ -47,7 +47,7 @@ defmodule Faktory.Mixfile do
       {:poison, "~> 3.1"},
       {:poolboy, "~> 1.5"},
       {:ex_doc, "~> 0.19.0", only: :dev},
-      {:certifi, "~> 2.0"},
+      {:socket, "~> 0.3"},
       {:mox, "~> 0.3", only: :test},
     ]
   end
