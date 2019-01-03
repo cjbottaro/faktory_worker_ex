@@ -39,6 +39,7 @@ defmodule Faktory do
     module = Module.safe_concat([module])
     options = Keyword.merge(module.faktory_options, options)
     client = options[:client] || get_env(:default_client)
+    jobtype = options[:jobtype]
 
     # if !Configuration.exists?(client) do
     #   name = Faktory.Utils.module_name(client)
@@ -46,7 +47,6 @@ defmodule Faktory do
     #     message: "#{name} not configured"
     # end
 
-    jobtype = Utils.module_name(module)
     job = options
       |> Keyword.merge(jid: new_jid(), jobtype: jobtype, args: args)
       |> Utils.stringify_keys

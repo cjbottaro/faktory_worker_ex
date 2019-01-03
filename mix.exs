@@ -48,7 +48,7 @@ defmodule Faktory.Mixfile do
       {:poolboy, "~> 1.5"},
       {:socket, "~> 0.3"},
       {:retryable_ex, "~> 2.0"},
-      {:ex_doc, "~> 0.19.0", only: :dev},
+      {:ex_doc, "~> 0.19", only: :dev},
       {:mox, "~> 0.3", only: :test},
     ]
   end
