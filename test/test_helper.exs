@@ -9,5 +9,7 @@ Faktory.flush
 {:ok, _} = PidMap.start_link
 {:ok, _} = TestJidPidMap.start_link
 
+Mox.defmock(Faktory.SocketMock, for: Faktory.Socket)
+
 ExUnit.configure(exclude: [pending: true])
 ExUnit.start()

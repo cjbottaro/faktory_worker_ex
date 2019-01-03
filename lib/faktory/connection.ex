@@ -28,6 +28,7 @@ defmodule Faktory.Connection do
     Map.get(config, :on_init, fn -> nil end).()
 
     config
+    |> Map.put_new(:socket_impl, Faktory.Socket)
     |> Map.put(:socket, nil)
     |> do_connect
   end
@@ -36,10 +37,10 @@ defmodule Faktory.Connection do
 
   def disconnect(info, state) do
     # Pull out variables.
-    %{socket: socket, host: host, port: port} = state
+    %{host: host, port: port} = state
 
     # Close the damn thing.
-    :ok = Socket.close(socket)
+    :ok = socket_close(state)
 
     case info do
       # Terminate normally.
@@ -66,26 +67,17 @@ defmodule Faktory.Connection do
     {:disconnect, {:close, from}, state}
   end
 
-  def handle_call({:send, data}, _from, %{socket: socket} = state) do
-    case Socket.Stream.send(socket, data) do
+  def handle_call({:send, data}, _from, state) do
+    case socket_send(state, data) do
       :ok -> {:reply, :ok, state}
       {:error, _} = error -> {:disconnect, error, error, state}
     end
   end
 
-  def handle_call({:recv, size}, _, %{socket: socket} = state) do
-    response = case size do
-      :line ->
-        Socket.packet!(socket, :line)
-        Socket.Stream.recv(socket, timeout: @default_timeout)
-      size ->
-        Socket.packet!(socket, :raw)
-        Socket.Stream.recv(socket, size, timeout: @default_timeout)
-    end
-
-    case response do
+  def handle_call({:recv, size}, _, state) do
+    case socket_recv(state, size, timeout: @default_timeout) do
       {:ok, data} ->
-        data = cleanup_data(data, size) |> IO.inspect
+        data = cleanup_data(data, size)
         {:reply, {:ok, data}, state}
       {:error, :timeout} = timeout ->
         {:reply, timeout, state}
@@ -102,7 +94,7 @@ defmodule Faktory.Connection do
       true -> "ssl://#{host}:#{port}"
     end
 
-    case Socket.connect(uri) do
+    case socket_connect(state, uri) do
       {:ok, socket} ->
         state = %{state | socket: socket}
         handshake!(state)
@@ -118,10 +110,7 @@ defmodule Faktory.Connection do
   defp handshake!(state) do
     alias Faktory.Utils
 
-    %{socket: socket, password: password} = state
-
-    Socket.packet!(socket, :line)
-    {:ok, <<"+HI", rest::binary>>} = Socket.Stream.recv(socket)
+    {:ok, <<"+HI", rest::binary>>} = socket_recv(state, :line)
 
     server_config = Poison.decode!(rest)
     server_version = server_config["v"]
@@ -130,6 +119,8 @@ defmodule Faktory.Connection do
       Logger.warn("Warning: Faktory server protocol #{server_version} in use, but this worker doesn't speak that version")
     end
 
+    password_opts = password_opts(state.password, server_config)
+
     payload = %{
       hostname: Utils.hostname,
       pid: Utils.unix_pid,
@@ -137,11 +128,11 @@ defmodule Faktory.Connection do
       v: 2,
     }
     |> add_wid(state) # Client connection don't have wid
-    |> Map.merge(password_opts(password, server_config))
+    |> Map.merge(password_opts)
     |> Poison.encode!
 
-    :ok = Socket.Stream.send(socket, "HELLO #{payload}\r\n")
-    {:ok, "+OK\r\n"} = Socket.Stream.recv(socket)
+    :ok = socket_send(state, "HELLO #{payload}\r\n")
+    {:ok, "+OK\r\n"} = socket_recv(state, :line)
   end
 
   defp add_wid(payload, %{wid: wid}), do: Map.put(payload, :wid, wid)
@@ -158,5 +149,21 @@ defmodule Faktory.Connection do
   # If size is :line, then we requested a whole line, so we chomp it.
   defp cleanup_data(data, :line), do: String.replace_suffix(data, "\r\n", "")
   defp cleanup_data(data, _), do: data
+
+  defp socket_connect(state, uri) do
+    state.socket_impl.connect(uri)
+  end
+
+  defp socket_close(state) do
+    state.socket_impl.close(state.socket)
+  end
+
+  defp socket_send(state, data) do
+    state.socket_impl.send(state.socket, data)
+  end
+
+  defp socket_recv(state, size, options \\ []) do
+    state.socket_impl.recv(state.socket, size, options)
+  end
 
 end
