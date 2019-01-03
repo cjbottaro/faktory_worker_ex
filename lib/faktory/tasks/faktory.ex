@@ -51,7 +51,6 @@ defmodule Mix.Tasks.Faktory do
 
     -c, --concurrency  Number of worker processes
     -q, --queues       Space seperated list of queues
-    -p, --pool         Connection pool size. Default: <concurrency>
     -t, --tls          Enable TLS when connecting to Faktory server. Default: disable TLS
     """
   end

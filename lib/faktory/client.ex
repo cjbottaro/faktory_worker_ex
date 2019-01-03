@@ -2,17 +2,17 @@ defmodule Faktory.Client do
   @moduledoc """
   Create and configure a client for _enqueing_ jobs.
 
-  It works exatly the same as configurating an Ecto Repo.
+  It works exatly the same as configuring an Ecto Repo.
 
   ```elixir
-  defmodule MyClient do
+  defmodule MyFaktoryClient do
     use Faktory.Client, otp_app: MyApp
   end
   ```
 
   ## Defaults
 
-  See `defaults/0` for the default client configuration values.
+  See `defaults/0` for default client configuration values.
 
   ## Compile time config
 
@@ -21,7 +21,7 @@ defmodule Faktory.Client do
   ```elixir
   use Mix.Config
 
-  config :my_app, MyClient,
+  config :my_app, MyFaktoryClient,
     host: "foo.bar",
     port: 1000
     pool: 10
@@ -31,14 +31,13 @@ defmodule Faktory.Client do
 
   Can be done with the `c:init/1` callback.
 
-  Can be down with environment variable tuples.
-
+  Can be done with environment variable tuples:
   ```elixir
   use Mix.Config
 
-  config :my_app, MyClient,
-    host: {:system, "FAKTORY_HOST"} # No default, errors if not found.
-    port: {:system, "FAKTORY_PORT", 1001} # Use default if not found.
+  config :my_app, MyFaktoryClient,
+    host: {:system, "FAKTORY_HOST"} # No default, errors if FAKTORY_HOST doesn't exist
+    port: {:system, "FAKTORY_PORT", 1001} # Use 1001 if FAKTORY_PORT doesn't exist
   ```
 
   ## Default client
@@ -48,7 +47,7 @@ defmodule Faktory.Client do
   For example:
   ```elixir
   MyJob.perform_async([1, 2, 3]) # Uses default client
-  MyJob.perform_async([1, 2, 3], client: OtherClient) # Uses some other client.
+  MyJob.perform_async([1, 2, 3], client: OtherFaktoryClient) # Uses some other client
   ```
   """
 
@@ -100,10 +99,10 @@ defmodule Faktory.Client do
   end
 
   @doc """
-  Callback for doing dynamic, runtime configuration.
+  Callback for doing runtime configuration.
 
   ```
-  defmodule MyClient do
+  defmodule MyFaktoryClient do
     use Faktory.Client, otp_app: :my_app
 
     def init(config) do
@@ -120,7 +119,7 @@ defmodule Faktory.Client do
   Returns a client's config after all runtime modifications have occurred.
 
   ```elixir
-  iex(5)> MyClient.config
+  iex(5)> MyFaktoryClient.config
   [
     port: 1001,
     host: "foo.bar",

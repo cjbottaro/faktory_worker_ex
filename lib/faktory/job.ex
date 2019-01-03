@@ -20,14 +20,13 @@ defmodule Faktory.Job do
   MyFunkyJob.perform_async([1, "foo"])
   ```
 
-  Notice `perform_async` takes a list who's size must match exactly the airty of
+  **IMPORTANT**: `perform_async` takes a list who's size must match exactly the airty of
   `perform`.
 
   ### Configuring
 
   You can configure various aspects of the job by passing a keyword list to
-  `faktory_options/1`. All keys are optional and their default values are
-  shown in the example below.
+  `faktory_options/1`.
 
   ```elixir
   defmodule MyFunkyJob do
@@ -38,6 +37,8 @@ defmodule Faktory.Job do
     # ...
   end
   ```
+
+  See `c:faktory_options/0` for available options and defaults.
 
   ### Runtime overrides
 
@@ -82,9 +83,15 @@ defmodule Faktory.Job do
   @doc """
   Returns the default options for a given job module.
 
-  Examples:
   ```
-  MyJob.faktory_options
+  iex(5)> MyFunkyJob.faktory_options
+  [
+    queue: "default",
+    jobtype: "MyFunkyJob",
+    retry: 25,
+    middleware: [],
+    backtrace: 10
+  ]
   ```
   """
   @callback faktory_options() :: options :: Keyword.t
@@ -93,9 +100,9 @@ defmodule Faktory.Job do
   Enqueue a job.
 
   `options` can override any options specified by `faktory_options/1`.
+
   For all valid options, see `c:faktory_options/0`.
 
-  Examples:
   ```
   job_args = [123, "abc"]
   MyJob.perform_async(job_args)
@@ -107,12 +114,7 @@ defmodule Faktory.Job do
   @doc """
   Set default options for all jobs of this type.
 
-  ## Options
-
-    * `:queue` - Name of queue. Default `"default"`
-    * `:jobtype` - Defaults to module name as a string.
-    * `:retry` - How many times to retry. Default `25`
-    * `:backtrace` - How many lines of backtrace to store if the job errors. Default `0`
+  For all valid options and their defaults, see `c:faktory_options/0`.
   """
   @spec faktory_options(Keyword.t) :: term
   defmacro faktory_options(options) do

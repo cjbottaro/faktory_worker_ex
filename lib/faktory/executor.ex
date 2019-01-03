@@ -1,4 +1,6 @@
 defmodule Faktory.Executor do
+  @moduledoc false
+  
   alias Faktory.{Logger, Utils, Middleware}
 
   def run(processor, job, middleware) do
