@@ -26,6 +26,17 @@ defmodule MyFaktoryWorker do
   use Faktory.Worker, otp_app: :my_cool_app
 end
 
+# You must add them to your app's supervision tree
+defmodule MyCoolApp.Application do
+  @moduledoc false
+  use Application
+
+  def start(_type, _args) do
+    children = [MyFaktoryClient, MyFaktoryWorker]
+    Supervisor.start_link(children, strategy: :one_for_one)
+  end
+end
+
 defmodule MyGreeterJob do
   use Faktory.Job
 

@@ -14,7 +14,6 @@ defmodule Mix.Tasks.Faktory do
   """
 
   use Mix.Task
-  alias Faktory.Logger
 
   @shortdoc "Start Faktory worker"
 

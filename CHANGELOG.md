@@ -1,5 +1,15 @@
 # faktory_worker_ex changes
 
+## 0.6.0
+-----------
+* (breaking) Configuration simplified (again); see readme.
+* Can override `jobtype` for enqueuing to workers in other languages.
+* Simplified supervision; removed all custom supervisor modules.
+* Workers no longer use connection pool; each processor has dedicated (linked) connection.
+* Simplify plain vs tls socket connections with the `socket` package.
+* Protocol now retries with the `retryable_ex` package.
+* Faktory 0.9.3
+
 ## 0.5.0
 -----------
 * (breaking) Simplified middleware; no longer pass the `chain` arg.

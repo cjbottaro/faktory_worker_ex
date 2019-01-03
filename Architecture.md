@@ -6,16 +6,15 @@ This document describes some high level design concepts.
 
 `faktory_worker_ex` tries to be a proper OTP app with complete supervision trees.
 
-Workers are all watched by a supervisor as are any connection pools. Any given
-worker is linked to a connection and whatever processis actually executing the
-job. So if either die, so will the worker and the supervisor should bring it
-back up.
+Clients use a `poolboy` pool of connections.
+
+Workers are supervised GenServers that are linked to connections.
+
+Heartbeat processes are also supervised.
 
 ## Connection
 
-The actually connections to the Faktory server use the [Connection](https://hexdocs.pm/connection/Connection.html) library which aids
-in error handling and reconnecting. If that fails, it should bring down whatever
-processes and the supervisors will take over.
+The actually connections to the Faktory server use the [Connection](https://hexdocs.pm/connection/Connection.html) library which aids in error handling and reconnecting. Talking to connections are wrapped with `retryable_ex`. If that fails, the process should die and supervisors will take over.
 
 ## Lost jobs?
 
@@ -27,9 +26,6 @@ issuing the ack.
 
 ## Memory bloat?
 
-Every job is executed in a completely new Elixir/Erlang process which dies
-when the job is finished. The only long running processes are the workers which
-just serve to fetch jobs and spawn processes to execute them.
+Every job is executed in its own BEAM process. Processors and connection pools are the only long running processes.
 
-It's kind of like the Resque model, but many Elixir/Erlang processes per Unix
-process.
+It's the Resque model, but efficient because of BEAM processes vs Unix processes.

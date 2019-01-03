@@ -8,11 +8,22 @@ defmodule Faktory.Client do
   defmodule MyFaktoryClient do
     use Faktory.Client, otp_app: MyApp
   end
+
+  # It must be added to your app's supervision tree
+  defmodule MyApp.Application do
+    @moduledoc false
+    use Application
+
+    def start(_type, _args) do
+      children = [MyFaktoryClient]
+      Supervisor.start_link(children, strategy: :one_for_one)
+    end
+  end
   ```
 
   ## Defaults
 
-  See `defaults/0` for default client configuration values.
+  See `defaults/0` for default client configuration.
 
   ## Compile time config
 
