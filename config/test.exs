@@ -16,5 +16,3 @@ config :faktory_worker_ex, Test.MiddlewareWorker,
   concurrency: 2,
   middleware: [BadMath],
   queues: ["middleware"]
-
-config :faktory_worker_ex, :socket, SocketMock

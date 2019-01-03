@@ -4,18 +4,28 @@ defmodule Faktory.Protocol do
   alias Faktory.Connection
   import Connection, only: [recv: 2]
 
+  # A Faktory.Connection uses the Connection module which means it
+  # will automatically try to reconnect on disconnections or errors.
+  # That's why we use retryable here; a connection can heal itself
+  # as opposed to letting a supervisor restart it.
+  import Retryable
+  @retry_options [
+    on: :error,
+    tries: 10,
+    sleep: 1.0
+  ]
+
   def push(conn, job) when is_list(job), do: push(conn, Map.new(job))
 
   def push(conn, job) do
     payload = Poison.encode!(job)
 
-    with :ok <- tx(conn, "PUSH #{payload}"),
-      {:ok, "OK"} <- rx(conn)
-    do
-      job["jid"]
-    else
-      {:error, :closed} -> push(conn, job) # Retries forever and without delay!
-      {:error, _message} = error -> error
+    retryable @retry_options, fn ->
+      with :ok <- tx(conn, "PUSH #{payload}"),
+        {:ok, "OK"} <- rx(conn)
+      do
+        job["jid"]
+      end
     end
   end
 
@@ -24,25 +34,23 @@ defmodule Faktory.Protocol do
   end
 
   def fetch(conn, queues) when is_binary(queues) do
-    with :ok <- tx(conn, "FETCH #{queues}"),
-      {:ok, job} <- rx(conn)
-    do
-      job && Poison.decode!(job)
-    else
-      {:error, :closed} -> fetch(conn, queues)  # Retries forever and without delay!
-      {:error, _message} = error -> error
+    retryable @retry_options, fn ->
+      with :ok <- tx(conn, "FETCH #{queues}"),
+        {:ok, job} <- rx(conn)
+      do
+        job && Poison.decode!(job)
+      end
     end
   end
 
   def ack(conn, jid) when is_binary(jid) do
     payload = %{"jid" => jid} |> Poison.encode!
-    with :ok <- tx(conn, "ACK #{payload}"),
-      {:ok, "OK"} <- rx(conn)
-    do
-      {:ok, jid}
-    else
-      {:error, :closed} -> ack(conn, jid)  # Retries forever and without delay!
-      {:error, _message} = error -> error
+    retryable @retry_options, fn ->
+      with :ok <- tx(conn, "ACK #{payload}"),
+        {:ok, "OK"} <- rx(conn)
+      do
+        {:ok, jid}
+      end
     end
   end
 
@@ -53,50 +61,46 @@ defmodule Faktory.Protocol do
       message: message,
       backtrace: backtrace
     } |> Poison.encode!
-    with :ok <- tx(conn, "FAIL #{payload}"),
-      {:ok, "OK"} <- rx(conn)
-    do
-      {:ok, jid}
-    else
-      {:error, :closed} -> fail(conn, jid, errtype, message, backtrace)  # Retries forever and without delay!
-      {:error, _message} = error -> error
+    retryable @retry_options, fn ->
+      with :ok <- tx(conn, "FAIL #{payload}"),
+        {:ok, "OK"} <- rx(conn)
+      do
+        {:ok, jid}
+      end
     end
   end
 
   def info(conn) do
-    with :ok <- tx(conn, "INFO"),
-      {:ok, info} <- rx(conn)
-    do
-      info && Poison.decode!(info)
-    else
-      {:error, :closed} -> info(conn)  # Retries forever and without delay!
-      {:error, _message} = error -> error
+    retryable @retry_options, fn ->
+      with :ok <- tx(conn, "INFO"),
+        {:ok, info} <- rx(conn)
+      do
+        info && Poison.decode!(info)
+      end
     end
   end
 
   def beat(conn, wid) do
     payload = %{wid: wid} |> Poison.encode!
-    with :ok <- tx(conn, "BEAT #{payload}"),
-      {:ok, response} <- rx(conn)
-    do
-      case response do
-        "OK" -> :ok
-        info -> {:ok, Poison.decode!(info)["signal"]}
+    retryable @retry_options, fn ->
+      with :ok <- tx(conn, "BEAT #{payload}"),
+        {:ok, response} <- rx(conn)
+      do
+        case response do
+          "OK" -> :ok
+          info -> {:ok, Poison.decode!(info)["signal"]}
+        end
       end
-    else
-      {:error, :closed} -> beat(conn, wid) # Retries forever and without delay!
-      {:error, _message} = error -> error
     end
   end
 
   def flush(conn) do
-    with :ok <- tx(conn, "FLUSH"),
-      {:ok, "OK"} <- rx(conn)
-    do
-      :ok
-    else
-      {:error, :closed} -> flush(conn) # Retries forever and without delay!
-      {:error, _message} = error -> error
+    retryable @retry_options, fn ->
+      with :ok <- tx(conn, "FLUSH"),
+        {:ok, "OK"} <- rx(conn)
+      do
+        :ok
+      end
     end
   end
 
@@ -115,7 +119,7 @@ defmodule Faktory.Protocol do
 
   defp rx(conn, size) when is_binary(size) do
     size = String.to_integer(size)
-    rx(conn, size) |> IO.inspect
+    rx(conn, size)
   end
 
   defp rx(_conn, size) when size == -1, do: {:ok, nil}
