@@ -4,28 +4,15 @@ defmodule Faktory.Protocol do
   alias Faktory.Connection
   import Connection, only: [recv: 2]
 
-  # A Faktory.Connection uses the Connection module which means it
-  # will automatically try to reconnect on disconnections or errors.
-  # That's why we use retryable here; a connection can heal itself
-  # as opposed to letting a supervisor restart it.
-  import Retryable
-  @retry_options [
-    on: :error,
-    tries: 10,
-    sleep: 1.0
-  ]
-
   def push(conn, job) when is_list(job), do: push(conn, Map.new(job))
 
   def push(conn, job) do
     payload = Poison.encode!(job)
 
-    retryable @retry_options, fn ->
-      with :ok <- tx(conn, "PUSH #{payload}"),
-        {:ok, "OK"} <- rx(conn)
-      do
-        job["jid"]
-      end
+    with :ok <- tx(conn, "PUSH #{payload}"),
+      {:ok, "OK"} <- rx(conn)
+    do
+      job["jid"]
     end
   end
 
@@ -34,23 +21,20 @@ defmodule Faktory.Protocol do
   end
 
   def fetch(conn, queues) when is_binary(queues) do
-    retryable @retry_options, fn ->
-      with :ok <- tx(conn, "FETCH #{queues}"),
-        {:ok, job} <- rx(conn)
-      do
-        job && Poison.decode!(job)
-      end
+    with :ok <- tx(conn, "FETCH #{queues}"),
+      {:ok, job} <- rx(conn)
+    do
+      job && Poison.decode!(job)
     end
   end
 
   def ack(conn, jid) when is_binary(jid) do
     payload = %{"jid" => jid} |> Poison.encode!
-    retryable @retry_options, fn ->
-      with :ok <- tx(conn, "ACK #{payload}"),
-        {:ok, "OK"} <- rx(conn)
-      do
-        {:ok, jid}
-      end
+
+    with :ok <- tx(conn, "ACK #{payload}"),
+      {:ok, "OK"} <- rx(conn)
+    do
+      {:ok, jid}
     end
   end
 
@@ -61,46 +45,40 @@ defmodule Faktory.Protocol do
       message: message,
       backtrace: backtrace
     } |> Poison.encode!
-    retryable @retry_options, fn ->
-      with :ok <- tx(conn, "FAIL #{payload}"),
-        {:ok, "OK"} <- rx(conn)
-      do
-        {:ok, jid}
-      end
+
+    with :ok <- tx(conn, "FAIL #{payload}"),
+      {:ok, "OK"} <- rx(conn)
+    do
+      {:ok, jid}
     end
   end
 
   def info(conn) do
-    retryable @retry_options, fn ->
-      with :ok <- tx(conn, "INFO"),
-        {:ok, info} <- rx(conn)
-      do
-        info && Poison.decode!(info)
-      end
+    with :ok <- tx(conn, "INFO"),
+      {:ok, info} <- rx(conn)
+    do
+      info && Poison.decode!(info)
     end
   end
 
   def beat(conn, wid) do
     payload = %{wid: wid} |> Poison.encode!
-    retryable @retry_options, fn ->
-      with :ok <- tx(conn, "BEAT #{payload}"),
-        {:ok, response} <- rx(conn)
-      do
-        case response do
-          "OK" -> :ok
-          info -> {:ok, Poison.decode!(info)["signal"]}
-        end
+
+    with :ok <- tx(conn, "BEAT #{payload}"),
+      {:ok, response} <- rx(conn)
+    do
+      case response do
+        "OK" -> :ok
+        info -> {:ok, Poison.decode!(info)["signal"]}
       end
     end
   end
 
   def flush(conn) do
-    retryable @retry_options, fn ->
-      with :ok <- tx(conn, "FLUSH"),
-        {:ok, "OK"} <- rx(conn)
-      do
-        :ok
-      end
+    with :ok <- tx(conn, "FLUSH"),
+      {:ok, "OK"} <- rx(conn)
+    do
+      :ok
     end
   end
 

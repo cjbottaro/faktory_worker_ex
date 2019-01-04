@@ -5,20 +5,37 @@ defmodule Faktory.Connection do
 
   @default_timeout 4000
 
+  # A Faktory.Connection uses the Connection module which means it
+  # will automatically try to reconnect on disconnections or errors.
+  # That's why we use retryable here; a connection can heal itself
+  # as opposed to letting a supervisor restart it.
+  import Retryable
+  @retry_options [
+    on: :error,
+    tries: 10,
+    sleep: 1.0
+  ]
+
   def start_link(config) do
     Connection.start_link(__MODULE__, config)
   end
 
   def send(conn, data) do
-    Connection.call(conn, {:send, data})
+    retryable @retry_options, fn ->
+      Connection.call(conn, {:send, data})
+    end
   end
 
   def recv(conn, size \\ :line) do
-    Connection.call(conn, {:recv, size})
+    retryable @retry_options, fn ->
+      Connection.call(conn, {:recv, size})
+    end
   end
 
   def close(conn) do
-    Connection.call(conn, :close)
+    retryable @retry_options, fn ->
+      Connection.call(conn, :close)
+    end
   end
 
   def init(config) do
