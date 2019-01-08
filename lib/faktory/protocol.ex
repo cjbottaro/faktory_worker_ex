@@ -21,7 +21,7 @@ defmodule Faktory.Protocol do
 
     retryable @retry_options, fn ->
       with :ok <- Connection.send(conn, "PUSH #{payload}"),
-        {:ok, "OK"} <- Connection.recv(conn, :line)
+        {:ok, "+OK"} <- Connection.recv(conn, :line)
       do
         job["jid"]
       end
@@ -53,7 +53,7 @@ defmodule Faktory.Protocol do
 
     retryable @retry_options, fn ->
       with :ok <- Connection.send(conn, "ACK #{payload}"),
-        {:ok, "OK"} <- Connection.recv(conn, :line)
+        {:ok, "+OK"} <- Connection.recv(conn, :line)
       do
         {:ok, jid}
       end
@@ -70,7 +70,7 @@ defmodule Faktory.Protocol do
 
     retryable @retry_options, fn ->
       with :ok <- Connection.send(conn, "FAIL #{payload}"),
-        {:ok, "OK"} <- Connection.recv(conn, :line)
+        {:ok, "+OK"} <- Connection.recv(conn, :line)
       do
         {:ok, jid}
       end
@@ -95,7 +95,7 @@ defmodule Faktory.Protocol do
 
     retryable @retry_options, fn ->
       with :ok <- Connection.send(conn, "BEAT #{payload}"),
-        {:ok, "OK"} <- Connection.recv(conn, :line)
+        {:ok, "+OK"} <- Connection.recv(conn, :line)
       do
         :ok
       else
@@ -108,7 +108,7 @@ defmodule Faktory.Protocol do
   def flush(conn) do
     retryable @retry_options, fn ->
       with :ok <- Connection.send(conn, "FLUSH"),
-        {:ok, "OK"} <- Connection.recv(conn, :line)
+        {:ok, "+OK"} <- Connection.recv(conn, :line)
       do
         :ok
       end
