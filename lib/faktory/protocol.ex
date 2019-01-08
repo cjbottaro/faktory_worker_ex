@@ -10,7 +10,7 @@ defmodule Faktory.Protocol do
   import Retryable
   @retry_options [
     on: :error,
-    tries: 10,
+    tries: 60,
     sleep: 1.0
   ]
 
