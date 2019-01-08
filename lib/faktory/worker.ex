@@ -11,7 +11,6 @@ defmodule Faktory.Worker do
 
   # It must be added to your app's supervision tree
   defmodule MyApp.Application do
-    @moduledoc false
     use Application
 
     def start(_type, _args) do
@@ -95,7 +94,6 @@ defmodule Faktory.Worker do
 
       def config, do: Faktory.Worker.config(__MODULE__)
       def child_spec(options \\ []), do: Faktory.Worker.child_spec(__MODULE__, options)
-      def start_link(options \\ []), do: Faktory.Worker.start_link(__MODULE__, options)
 
     end
   end

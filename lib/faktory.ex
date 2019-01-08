@@ -9,7 +9,7 @@ defmodule Faktory do
   # A connection to the Faktory server.
   @type conn :: pid
 
-  alias Faktory.{Logger, Protocol, Utils, Configuration}
+  alias Faktory.{Logger, Protocol, Utils}
 
   defdelegate app_name, to: Utils
   defdelegate env, to: Utils

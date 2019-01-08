@@ -1,7 +1,7 @@
 defmodule Faktory.Mixfile do
   use Mix.Project
 
-  @version "0.5.0"
+  @version "0.6.0"
 
   def project do
     [
@@ -63,7 +63,7 @@ defmodule Faktory.Mixfile do
 
   defp aliases do
     [
-      # compile: ["compile --warnings-as-errors"]
+      compile: ["compile --warnings-as-errors"]
     ]
   end
 end

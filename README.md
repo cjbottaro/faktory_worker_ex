@@ -28,7 +28,6 @@ end
 
 # You must add them to your app's supervision tree
 defmodule MyCoolApp.Application do
-  @moduledoc false
   use Application
 
   def start(_type, _args) do

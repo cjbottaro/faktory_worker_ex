@@ -32,7 +32,7 @@ defmodule Faktory.Connection do
     |> Map.put(:socket, nil)
 
     # Aid testing.
-    if_test do: callback(:on_init, state)
+    if_test do: state[:on_init] && state[:on_init].()
 
     {:connect, :init, state}
   end
@@ -44,7 +44,7 @@ defmodule Faktory.Connection do
       :ok <- handshake(state)
     do
       log_connect(context, state)
-      if_test do: callback(:on_connect, state)
+      if_test do: state[:on_connect] && state[:on_connect].()
       {:ok, state}
     else
       {:error, reason} ->
@@ -180,9 +180,5 @@ defmodule Faktory.Connection do
   end
 
   defp chomp(string), do: String.replace_suffix(string, "\r\n", "")
-
-  defp callback(name, state) do
-    if state[name], do: state[name].()
-  end
 
 end

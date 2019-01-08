@@ -11,7 +11,6 @@ defmodule Faktory.Client do
 
   # It must be added to your app's supervision tree
   defmodule MyApp.Application do
-    @moduledoc false
     use Application
 
     def start(_type, _args) do
@@ -53,7 +52,8 @@ defmodule Faktory.Client do
 
   ## Default client
 
-  The first client to startup is the _default client_.
+  The first client to startup is the _default client_, unless otherwise specifed by
+  the `:default` option.
 
   For example:
   ```elixir
@@ -68,7 +68,8 @@ defmodule Faktory.Client do
     pool: 5,
     middleware: [],
     password: nil,
-    use_tls: false
+    use_tls: false,
+    default: false
   ]
 
   @doc """
@@ -82,7 +83,8 @@ defmodule Faktory.Client do
     pool: 5,
     middleware: [],
     password: nil,
-    use_tls: false
+    use_tls: false,
+    default: false
   ]
   ```
   """
@@ -104,7 +106,6 @@ defmodule Faktory.Client do
 
       def config, do: Faktory.Client.config(__MODULE__)
       def child_spec(_opt \\ []), do: Faktory.Client.child_spec(__MODULE__)
-      def start_link(options \\ []), do: Faktory.Client.start_link(__MODULE__, options)
 
     end
   end
@@ -137,7 +138,8 @@ defmodule Faktory.Client do
     pool: 10,
     middleware: [],
     password: nil,
-    use_tls: false
+    use_tls: false,
+    default: true
   ]
   ```
   """
@@ -160,9 +162,10 @@ defmodule Faktory.Client do
       max_overflow: 2
     ]
 
-    # Mark the first client started as the default client.
-    if !Faktory.get_env(:default_client) do
-      Faktory.put_env(:default_client, module)
+    # If the user hasn't specified a default client, we default to the first client started.
+    cond do
+      config[:default] -> Faktory.put_env(:default_client, module)
+      !Faktory.get_env(:default_client) -> Faktory.put_env(:default_client, module)
     end
 
     :poolboy.child_spec(module, pool_options, config)

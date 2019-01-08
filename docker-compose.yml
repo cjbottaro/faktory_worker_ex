@@ -3,14 +3,14 @@ version: "3"
 services:
 
   dev:
-    image: contribsys/faktory:0.9.3
+    image: contribsys/faktory:0.9.4
     command: ./faktory -b :7419 -w :7420 -l debug
     ports:
       - "7419:7419"
       - "7420:7420"
 
   test:
-    image: contribsys/faktory:0.9.3
+    image: contribsys/faktory:0.9.4
     command: ./faktory -b :7419 -l debug
     ports:
       - "7421:7419"
