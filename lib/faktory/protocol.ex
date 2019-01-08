@@ -42,7 +42,7 @@ defmodule Faktory.Protocol do
       do
         Poison.decode!(json)
       else
-        {:size, "-1"} -> {:ok, nil}
+        {:size, "-1"} -> nil
         error -> error
       end
     end
