@@ -6,7 +6,7 @@ defmodule Faktory.Worker do
 
   ```elixir
   defmodule MyFaktoryWorker do
-    use Faktory.Worker, otp_app: MyApp
+    use Faktory.Worker, otp_app: :my_app
   end
 
   # It must be added to your app's supervision tree
