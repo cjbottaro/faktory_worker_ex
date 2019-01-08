@@ -2,17 +2,29 @@ defmodule Faktory.Protocol do
   @moduledoc false
 
   alias Faktory.Connection
-  import Connection, only: [recv: 2]
+
+  # A Faktory.Connection uses the Connection module which means it
+  # will automatically try to reconnect on disconnections or errors.
+  # That's why we use retryable here; a connection can heal itself
+  # as opposed to letting a supervisor restart it.
+  import Retryable
+  @retry_options [
+    on: :error,
+    tries: 10,
+    sleep: 1.0
+  ]
 
   def push(conn, job) when is_list(job), do: push(conn, Map.new(job))
 
   def push(conn, job) do
     payload = Poison.encode!(job)
 
-    with :ok <- tx(conn, "PUSH #{payload}"),
-      {:ok, "OK"} <- rx(conn)
-    do
-      job["jid"]
+    retryable @retry_options, fn ->
+      with :ok <- Connection.send(conn, "PUSH #{payload}"),
+        {:ok, "OK"} <- Connection.recv(conn, :line)
+      do
+        job["jid"]
+      end
     end
   end
 
@@ -21,20 +33,30 @@ defmodule Faktory.Protocol do
   end
 
   def fetch(conn, queues) when is_binary(queues) do
-    with :ok <- tx(conn, "FETCH #{queues}"),
-      {:ok, job} <- rx(conn)
-    do
-      job && Poison.decode!(job)
+    retryable @retry_options, fn ->
+      with :ok <- Connection.send(conn, "FETCH #{queues}"),
+        {:ok, <<"$", size::binary>>} <- Connection.recv(conn, :line),
+        {:size, size} when size != "-1" <- {:size, size},
+        {:ok, json} <- Connection.recv(conn, String.to_integer(size)),
+        {:ok, ""} <- Connection.recv(conn, :line)
+      do
+        Poison.decode!(json)
+      else
+        {:size, "-1"} -> {:ok, nil}
+        error -> error
+      end
     end
   end
 
   def ack(conn, jid) when is_binary(jid) do
     payload = %{"jid" => jid} |> Poison.encode!
 
-    with :ok <- tx(conn, "ACK #{payload}"),
-      {:ok, "OK"} <- rx(conn)
-    do
-      {:ok, jid}
+    retryable @retry_options, fn ->
+      with :ok <- Connection.send(conn, "ACK #{payload}"),
+        {:ok, "OK"} <- Connection.recv(conn, :line)
+      do
+        {:ok, jid}
+      end
     end
   end
 
@@ -46,74 +68,50 @@ defmodule Faktory.Protocol do
       backtrace: backtrace
     } |> Poison.encode!
 
-    with :ok <- tx(conn, "FAIL #{payload}"),
-      {:ok, "OK"} <- rx(conn)
-    do
-      {:ok, jid}
+    retryable @retry_options, fn ->
+      with :ok <- Connection.send(conn, "FAIL #{payload}"),
+        {:ok, "OK"} <- Connection.recv(conn, :line)
+      do
+        {:ok, jid}
+      end
     end
   end
 
   def info(conn) do
-    with :ok <- tx(conn, "INFO"),
-      {:ok, info} <- rx(conn)
-    do
-      info && Poison.decode!(info)
+    retryable @retry_options, fn ->
+      with :ok <- Connection.send(conn, "INFO"),
+        {:ok, <<"$", size::binary>>} <- Connection.recv(conn, :line),
+        size = String.to_integer(size),
+        {:ok, json} <- Connection.recv(conn, size),
+        {:ok, ""} <- Connection.recv(conn, :line)
+      do
+        Poison.decode(json)
+      end
     end
   end
 
   def beat(conn, wid) do
     payload = %{wid: wid} |> Poison.encode!
 
-    with :ok <- tx(conn, "BEAT #{payload}"),
-      {:ok, response} <- rx(conn)
-    do
-      case response do
-        "OK" -> :ok
-        info -> {:ok, Poison.decode!(info)["signal"]}
+    retryable @retry_options, fn ->
+      with :ok <- Connection.send(conn, "BEAT #{payload}"),
+        {:ok, "OK"} <- Connection.recv(conn, :line)
+      do
+        :ok
+      else
+        {:ok, json} -> {:ok, Poison.decode!(json)}
+        error -> error
       end
     end
   end
 
   def flush(conn) do
-    with :ok <- tx(conn, "FLUSH"),
-      {:ok, "OK"} <- rx(conn)
-    do
-      :ok
-    end
-  end
-
-  def tx(conn, payload) do
-    Connection.send(conn, "#{payload}\r\n")
-  end
-
-  def rx(conn) do
-    case recv(conn, :line) do
-      {:ok, <<"+", rest::binary>>} -> {:ok, rest}
-      {:ok, <<"-", error::binary>>} -> {:error, error}
-      {:ok, <<"$", size::binary>>} -> rx(conn, size)
-      {:error, _} = error -> error
-    end
-  end
-
-  defp rx(conn, size) when is_binary(size) do
-    size = String.to_integer(size)
-    rx(conn, size)
-  end
-
-  defp rx(_conn, size) when size == -1, do: {:ok, nil}
-
-  defp rx(conn, size) when size == 0 do
-    case recv(conn, :line) do
-      {:ok, _} -> {:ok, nil}
-      {:error, _} = error -> error
-    end
-  end
-
-  defp rx(conn, size) do
-    retval = recv(conn, size)
-    case recv(conn, :line) do
-      {:ok, _} -> retval
-      {:error, _} = error -> error
+    retryable @retry_options, fn ->
+      with :ok <- Connection.send(conn, "FLUSH"),
+        {:ok, "OK"} <- Connection.recv(conn, :line)
+      do
+        :ok
+      end
     end
   end
 
