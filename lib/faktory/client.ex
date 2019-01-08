@@ -6,7 +6,7 @@ defmodule Faktory.Client do
 
   ```elixir
   defmodule MyFaktoryClient do
-    use Faktory.Client, otp_app: MyApp
+    use Faktory.Client, otp_app: :my_app
   end
 
   # It must be added to your app's supervision tree
