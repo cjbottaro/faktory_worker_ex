@@ -36,7 +36,8 @@ defmodule Faktory.Mixfile do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger]
+      extra_applications: [:logger],
+      mod: {Faktory.Application, []}
     ]
   end
 
@@ -48,6 +49,7 @@ defmodule Faktory.Mixfile do
       {:poolboy, "~> 1.5"},
       {:socket, "~> 0.3"},
       {:retryable_ex, "~> 2.0"},
+      {:blocking_queue, "~> 1.0"},
       {:ex_doc, "~> 0.19", only: :dev},
       {:mox, "~> 0.3", only: :test},
     ]
@@ -63,7 +65,7 @@ defmodule Faktory.Mixfile do
 
   defp aliases do
     [
-      compile: ["compile --warnings-as-errors"]
+      # compile: ["compile --warnings-as-errors"]
     ]
   end
 end

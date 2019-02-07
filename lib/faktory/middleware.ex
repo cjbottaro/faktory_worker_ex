@@ -43,7 +43,6 @@ defmodule Faktory.Middleware do
 
   ```elixir
   config :faktory_worker_ex, MyWorkerConfig,
-    adapter: Faktory.Configuration.Worker,
     middleware: [JobTimer]
   ```
 
