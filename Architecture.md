@@ -2,9 +2,17 @@
 
 This document describes some high level design concepts.
 
-## Supervision
+## Workers are queue based
 
-`faktory_worker_ex` tries to be a proper OTP app with complete supervision trees.
+The following diagram shows (almost) all the processes involved in a `Worker`.
+
+![Diagram](http://storage.stochasticbytes.com.s3.amazonaws.com/W5kEiEJr.png)
+
+1. The `Producer` fetches jobs from the Faktory server and enqueues them on the `Job Queue`.
+1. Multiple `Consumers` dequeue jobs from the `Job Queue`, process them, and enqueue the results onto the `Report Queue`.
+1. The `Reporter` dequeues results and reports a corresponding `ack` or `fail` to the Faktory server.
+
+The number of jobs that can be processed concurrently is equal to the number of `Consumers`, which is set by the `concurrency` option.
 
 Clients use a `poolboy` pool of connections.
 

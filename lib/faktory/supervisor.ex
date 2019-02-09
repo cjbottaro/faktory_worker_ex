@@ -9,6 +9,11 @@ defmodule Faktory.Supervisor do
   end
 
   def init(config) do
+    heartbeat = %{
+      id: {config.module, :heartbeat},
+      start: {Faktory.Heartbeat, :start_link, [config]}
+    }
+
     name = Faktory.Registry.name(config.module, :job_queue)
     job_queue = %{
       id: {config.module, :job_queue},
@@ -21,12 +26,13 @@ defmodule Faktory.Supervisor do
       start: {BlockingQueue, :start_link, [config.concurrency * 3, [name: name]]}
     }
 
-    # producers = Enum.map 1..1, fn index ->
-    #   %{
-    #     id: {config.module, Faktory.Producer, index},
-    #     start: {Faktory.Producer, :start_link, [config.module]}
-    #   }
-    # end
+    # TODO make the count configurable
+    producers = Enum.map 1..1, fn index ->
+      %{
+        id: {config.module, Faktory.Producer, index},
+        start: {Faktory.Producer, :start_link, [config]}
+      }
+    end
 
     consumers = Enum.map 1..config.concurrency, fn index ->
       %{
@@ -34,12 +40,20 @@ defmodule Faktory.Supervisor do
         start: {Faktory.Consumer, :start_link, [config]}
       }
     end
-    # consumers = []
+
+    # TODO make the count configurable
+    reporters = Enum.map 1..1, fn index ->
+      %{
+        id: {config.module, Faktory.Reporter, index},
+        start: {Faktory.Reporter, :start_link, [config]}
+      }
+    end
 
     children = [
+      heartbeat,
       job_queue,
       report_queue
-      | consumers
+      | producers ++ consumers ++ reporters
     ]
 
     Supervisor.init(children, strategy: :one_for_one)

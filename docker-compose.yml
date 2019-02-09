@@ -11,7 +11,7 @@ services:
 
   test:
     image: contribsys/faktory:0.9.4
-    command: ./faktory -b :7419 -l debug
+    command: ./faktory -b :7419 -w :7420 -l debug
     ports:
       - "7421:7419"
       - "7422:7420"

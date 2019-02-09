@@ -2,6 +2,8 @@ defmodule Faktory.JobTask do
   defstruct [:config, :job, :report_queue, :task, :start_time]
 
   def run(state) do
+    log(:start, state)
+
     state = %{state |
       task: Task.async(__MODULE__, :perform, [state]),
       start_time: System.monotonic_time(:millisecond)
@@ -46,17 +48,43 @@ defmodule Faktory.JobTask do
     end
 
     case reason do
-      {exception, trace} -> handle_exception(state, exception, trace)
+      {error, trace} -> if Exception.exception?(error) do
+        handle_exception(state, error, trace)
+      else
+        handle_error(state, reason)
+      end
       :killed -> handle_killed(state)
       value -> handle_unknown(state, value)
     end
   end
 
   defp handle_exception(state, exception, trace) do
+    trace = Exception.format_stacktrace(trace)
+    |> String.split("\n")
+    |> Enum.map(&String.replace_leading(&1, " ", ""))
+
     fail(state,
       errtype: exception.__struct__ |> inspect,
       message: Exception.message(exception),
-      trace: Exception.format_stacktrace(trace)
+      trace: trace
+    )
+  end
+
+  defp handle_error(state, reason) do
+    lines = Exception.format_exit(reason)
+    |> String.split("\n")
+    |> Enum.map(&String.replace_leading(&1, " ", ""))
+
+    [_trash, type | trace] = lines
+    [_trace, errtype, message] = String.split(type, " ", parts: 3)
+
+    errtype = String.replace_prefix(errtype, "(", "")
+    errtype = String.replace_suffix(errtype, ")", "")
+
+    fail(state,
+      errtype: errtype,
+      message: message,
+      trace: trace
     )
   end
 
@@ -84,12 +112,19 @@ defmodule Faktory.JobTask do
     pid     = inspect(self())
     jid     = state.job["jid"]
     jobtype = state.job["jobtype"]
-    time    = elapsed(state)
-    message = case type do
-      :ack -> "✓"
-      :fail -> "✘"
+    status  = case type do
+      :start  -> "S"
+      :ack    -> "✓"
+      :fail   -> "✘"
     end
-    Faktory.Logger.info("#{message} #{pid} jid-#{jid} (#{jobtype}) #{time}s")
+    message = "#{status} #{pid} jid-#{jid} (#{jobtype})"
+
+    if type == :start do
+      Faktory.Logger.info(message)
+    else
+      time = elapsed(state)
+      Faktory.Logger.info("#{message} #{time}s")
+    end
   end
 
   defp elapsed(state) do

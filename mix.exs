@@ -48,7 +48,6 @@ defmodule Faktory.Mixfile do
       {:poison, "~> 3.1"},
       {:poolboy, "~> 1.5"},
       {:socket, "~> 0.3"},
-      {:retryable_ex, "~> 2.0"},
       {:blocking_queue, "~> 1.0"},
       {:ex_doc, "~> 0.19", only: :dev},
       {:mox, "~> 0.3", only: :test},

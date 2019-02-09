@@ -1,11 +1,12 @@
 defmodule Faktory.Consumer do
+  @moduledoc false
 
   def start_link(config) do
-    {:ok, spawn_link(__MODULE__, :run, [config])}
+    Task.start_link(__MODULE__, :run, [config])
   end
 
   def run(config) do
-    Process.flag(:trap_exit, true)
+    Process.flag(:trap_exit, true) # The secret sauce.
 
     job_queue = Faktory.Registry.name(config.module, :job_queue)
     report_queue = Faktory.Registry.name(config.module, :report_queue)
@@ -15,12 +16,11 @@ defmodule Faktory.Consumer do
   end
 
   def process(job, config, report_queue) do
-    job_task = %Faktory.JobTask{
+    %Faktory.JobTask{
       job: job,
       config: config,
       report_queue: report_queue
-    }
-    Faktory.JobTask.run(job_task)
+    } |> Faktory.JobTask.run
   end
 
 end
