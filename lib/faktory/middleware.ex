@@ -42,7 +42,7 @@ defmodule Faktory.Middleware do
   Next add it to the worker configuration.
 
   ```elixir
-  config :faktory_worker_ex, MyWorkerConfig,
+  config :my_cool_app, MyWorkerConfig,
     middleware: [JobTimer]
   ```
 

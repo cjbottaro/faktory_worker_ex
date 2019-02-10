@@ -1,4 +1,6 @@
 defmodule Faktory.Producer do
+  @moduledoc false
+
   defstruct [:config, :job_queue, :conn, :errors]
 
   def start_link(config) do

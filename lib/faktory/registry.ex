@@ -1,4 +1,5 @@
 defmodule Faktory.Registry do
+  @moduledoc false
 
   def child_spec(_args) do
     %{

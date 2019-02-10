@@ -1,4 +1,5 @@
 defmodule Faktory.JobTask do
+  @moduledoc false
   defstruct [:config, :job, :report_queue, :task, :start_time]
 
   def run(state) do
