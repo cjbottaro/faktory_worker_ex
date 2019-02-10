@@ -10,15 +10,18 @@ The following diagram shows (almost) all the processes involved in a `Worker`.
 
 1. The `Producer` fetches jobs from the Faktory server and enqueues them on the `Job Queue`.
 1. Multiple `Consumers` dequeue jobs from the `Job Queue`, process them, and enqueue the results onto the `Report Queue`.
-1. The `Reporter` dequeues results and reports a corresponding `ack` or `fail` to the Faktory server.
+1. The `Reporter` dequeues results and reports corresponding `ack` or `fail` messages to the Faktory server.
 
 The number of jobs that can be processed concurrently is equal to the number of `Consumers`, which is set by the `concurrency` option.
 
-Clients use a `poolboy` pool of connections.
+## Worker Connections
 
-Workers are supervised GenServers that are linked to connections.
+A worker only makes 3 connections to the Faktory server, no matter what the concurrency is set to:
+1. Producer (for fetching jobs)
+1. Reporter (for acking or failing jobs)
+1. Heartbeat (send a required keepalive message every 15 seconds)
 
-Heartbeat processes are also supervised.
+
 
 ## Connection
 

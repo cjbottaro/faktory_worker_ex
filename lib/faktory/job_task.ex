@@ -53,8 +53,7 @@ defmodule Faktory.JobTask do
       else
         handle_error(state, reason)
       end
-      :killed -> handle_killed(state)
-      value -> handle_unknown(state, value)
+      reason -> handle_exit_reason(state, reason)
     end
   end
 
@@ -88,12 +87,8 @@ defmodule Faktory.JobTask do
     )
   end
 
-  defp handle_killed(state) do
-    fail(state, errtype: ":killed")
-  end
-
-  defp handle_unknown(state, value) do
-    fail(state, errtype: ":unknown", trace: inspect(value))
+  defp handle_exit_reason(state, reason) do
+    fail(state, errtype: "exit", message: inspect(reason))
   end
 
   defp ack(state) do

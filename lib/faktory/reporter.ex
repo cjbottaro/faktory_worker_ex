@@ -26,7 +26,7 @@ defmodule Faktory.Reporter do
 
   defp ack(conn, jid, errors \\ 0) do
     case Faktory.Protocol.ack(conn, jid) do
-      {:ok, jid} -> log_success(:ack, jid)
+      {:ok, jid} -> log_success(:ack, %{jid: jid})
       {:error, reason} ->
         log_and_sleep(:ack, reason, errors)
         ack(conn, jid, errors + 1) # Retry
@@ -39,15 +39,17 @@ defmodule Faktory.Reporter do
     trace   = info[:trace]
 
     case Faktory.Protocol.fail(conn, jid, errtype, message, trace) do
-      {:ok, jid} -> log_success(:fail, jid)
+      {:ok, jid} -> log_success(:fail, %{jid: jid, error: info})
       {:error, reason} ->
         log_and_sleep(:fail, reason, errors)
         fail(conn, jid, info, errors + 1) # Retry
     end
   end
 
-  defp log_success(op, jid) do
-    Logger.debug("#{op} success: #{jid}")
+  defp log_success(op, data) do
+    import Utils, only: [if_test: 1]
+    Logger.debug("#{op} success: #{data.jid}")
+    if_test do: send TestJidPidMap.get(data.jid), {op, data}
   end
 
   defp log_and_sleep(op, reason, _errors) do

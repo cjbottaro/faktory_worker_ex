@@ -5,7 +5,7 @@ defmodule BasicTest do
     job = AddWorker.perform_async([PidMap.register, 1, 2])
     jid = job["jid"]
 
-    assert_receive {:report_ack, %{job: %{"jid" => ^jid}}}
+    assert_receive {:ack, %{jid: ^jid}}
     assert_receive {:add_result, 3}
   end
 
@@ -25,24 +25,25 @@ defmodule BasicTest do
     job = AddWorker.perform_async([PidMap.register, 1, "foo"])
     jid = job["jid"]
 
-    assert_receive {:report_fail, %{job: %{"jid" => ^jid}, error: error}}
-    assert {"ArithmeticError", _, _} = error
+    assert_receive {:fail, %{jid: ^jid, error: error}}
+    assert error[:errtype] == "ArithmeticError"
   end
 
   test "worker handles executor dying from brutal kill" do
     job = DieWorker.perform_async([:kill])
     jid = job["jid"]
 
-    assert_receive {:report_fail, %{job: %{"jid" => ^jid}, error: error}}
-    assert {"killed", _, _} = error
+    assert_receive {:fail, %{jid: ^jid, error: error}}
+    assert error[:errtype] == "exit"
+    assert error[:message] == ":killed"
   end
 
   test "worker handles executor dying from linked process" do
     job = DieWorker.perform_async([:spawn])
     jid = job["jid"]
 
-    assert_receive {:report_fail, %{job: %{"jid" => ^jid}, error: error}}
-    assert {"UndefinedFunctionError", _, _} = error
+    assert_receive {:fail, %{jid: ^jid, error: error}}
+    assert error[:errtype] == "UndefinedFunctionError"
   end
 
 end
