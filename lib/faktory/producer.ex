@@ -31,7 +31,10 @@ defmodule Faktory.Producer do
     queues = state.config.queues
 
     case Faktory.Protocol.fetch(conn, queues) do
-      {:error, reason} -> handle_error(state, reason)
+      {:error, reason} ->
+        log_and_sleep(state, reason)
+        state = %{state | errors: state.errors + 1}
+        fetch(state) # Try again.
       nil -> nil
       job -> job
     end
@@ -42,20 +45,15 @@ defmodule Faktory.Producer do
     %{state | errors: 0}
   end
 
-  defp handle_error(state, :closed) do
-    handle_error(state, "connection closed")
+  defp log_and_sleep(state, :closed) do
+    log_and_sleep(state, "connection closed")
   end
 
-  defp handle_error(state, reason) do
+  defp log_and_sleep(state, reason) do
     reason = normalize(reason)
-
-    # TODO exponential backoff based on state.errors
-    Faktory.Logger.warn("fetch failed: #{reason} -- retrying in 1s")
-    Process.sleep(1000)
-
-    state = %{state | errors: state.errors + 1}
-
-    fetch(state) # Try again.
+    sleep_time = Faktory.Utils.exp_backoff(state.errors)
+    Faktory.Logger.warn("fetch failed: #{reason} -- retrying in #{sleep_time/1000}s")
+    Process.sleep(sleep_time)
   end
 
   defp normalize(reason) when is_binary(reason), do: reason

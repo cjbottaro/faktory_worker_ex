@@ -1,5 +1,12 @@
 # faktory_worker_ex changes
 
+## 0.7.0
+-----------
+* The great simplication refactor; everything done in this version is to reduce conceptual complexity and make the code easier to read and understand.
+* Changed to a queue based architecture (reduces number of connections to Faktory server).
+* No more Genservers, the components of a worker (producer, consumers, reporter) are all supervised tasks. Jobs are also run in tasks (spawned by the consumers).
+* Removed `retryable_ex`; workers will retry when fetching, acking, and failing jobs, but all else is up to the user now.
+
 ## 0.6.0
 -----------
 * (breaking) Configuration simplified (again); see readme.

@@ -52,11 +52,11 @@ defmodule Faktory.Reporter do
     if_test do: send TestJidPidMap.get(data.jid), {op, data}
   end
 
-  defp log_and_sleep(op, reason, _errors) do
+  defp log_and_sleep(op, reason, errors) do
     reason = Utils.stringify(reason)
-    retry_time = 1000 # TODO exponential backoff based of errors
-    Logger.warn("#{op} failure: #{reason} -- retrying in #{retry_time/1000}s")
-    Process.sleep(retry_time)
+    sleep_time = Utils.exp_backoff(errors)
+    Logger.warn("#{op} failure: #{reason} -- retrying in #{sleep_time/1000}s")
+    Process.sleep(sleep_time)
   end
 
 end
