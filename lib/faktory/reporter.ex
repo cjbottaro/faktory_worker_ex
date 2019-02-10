@@ -34,9 +34,9 @@ defmodule Faktory.Reporter do
   end
 
   defp fail(conn, jid, info, errors \\ 0) do
-    errtype = info[:errtype]
-    message = info[:message]
-    trace   = info[:trace]
+    errtype = info.errtype
+    message = info.message
+    trace   = info.trace
 
     case Faktory.Protocol.fail(conn, jid, errtype, message, trace) do
       {:ok, jid} -> log_success(:fail, %{jid: jid, error: info})

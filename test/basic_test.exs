@@ -26,7 +26,7 @@ defmodule BasicTest do
     jid = job["jid"]
 
     assert_receive {:fail, %{jid: ^jid, error: error}}
-    assert error[:errtype] == "ArithmeticError"
+    assert error.errtype == "ArithmeticError"
   end
 
   test "worker handles executor dying from brutal kill" do
@@ -34,8 +34,8 @@ defmodule BasicTest do
     jid = job["jid"]
 
     assert_receive {:fail, %{jid: ^jid, error: error}}
-    assert error[:errtype] == "exit"
-    assert error[:message] == ":killed"
+    assert error.errtype == "exit"
+    assert error.message == ":killed"
   end
 
   test "worker handles executor dying from linked process" do
@@ -43,7 +43,7 @@ defmodule BasicTest do
     jid = job["jid"]
 
     assert_receive {:fail, %{jid: ^jid, error: error}}
-    assert error[:errtype] == "UndefinedFunctionError"
+    assert error.errtype == "UndefinedFunctionError"
   end
 
 end

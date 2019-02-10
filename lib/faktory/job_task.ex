@@ -47,48 +47,8 @@ defmodule Faktory.JobTask do
       {:EXIT, ^task_pid, ^reason} -> nil
     end
 
-    case reason do
-      {error, trace} -> if Exception.exception?(error) do
-        handle_exception(state, error, trace)
-      else
-        handle_error(state, reason)
-      end
-      reason -> handle_exit_reason(state, reason)
-    end
-  end
-
-  defp handle_exception(state, exception, trace) do
-    trace = Exception.format_stacktrace(trace)
-    |> String.split("\n")
-    |> Enum.map(&String.replace_leading(&1, " ", ""))
-
-    fail(state,
-      errtype: exception.__struct__ |> inspect,
-      message: Exception.message(exception),
-      trace: trace
-    )
-  end
-
-  defp handle_error(state, reason) do
-    lines = Exception.format_exit(reason)
-    |> String.split("\n")
-    |> Enum.map(&String.replace_leading(&1, " ", ""))
-
-    [_trash, type | trace] = lines
-    [_trace, errtype, message] = String.split(type, " ", parts: 3)
-
-    errtype = String.replace_prefix(errtype, "(", "")
-    errtype = String.replace_suffix(errtype, ")", "")
-
-    fail(state,
-      errtype: errtype,
-      message: message,
-      trace: trace
-    )
-  end
-
-  defp handle_exit_reason(state, reason) do
-    fail(state, errtype: "exit", message: inspect(reason))
+    error = Faktory.Error.from_reason(reason)
+    fail(state, error)
   end
 
   defp ack(state) do
@@ -97,9 +57,9 @@ defmodule Faktory.JobTask do
     BlockingQueue.push(state.report_queue, item)
   end
 
-  defp fail(state, reason) do
+  defp fail(state, error) do
     log(:fail, state)
-    item = {:fail, state.job["jid"], reason}
+    item = {:fail, state.job["jid"], error}
     BlockingQueue.push(state.report_queue, item)
   end
 
