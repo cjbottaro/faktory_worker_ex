@@ -14,7 +14,7 @@ defmodule Faktory.JobTask do
     # exits so that the catch clause in the try block works.
 
     try do
-      Task.await(state.task)
+      Task.await(state.task, :infinity)
     catch
       :exit, reason -> handle_exit(state, reason)
     else
