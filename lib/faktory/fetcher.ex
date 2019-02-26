@@ -1,7 +1,7 @@
-defmodule Faktory.Producer do
+defmodule Faktory.Fetcher do
   @moduledoc false
 
-  defstruct [:config, :conn, :errors]
+  defstruct [:config, :conn]
 
   use GenStage
 
@@ -15,8 +15,7 @@ defmodule Faktory.Producer do
 
     state = %__MODULE__{
       config: config,
-      conn: conn,
-      errors: 0
+      conn: conn
     }
 
     {:producer, state}

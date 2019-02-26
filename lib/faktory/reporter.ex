@@ -27,7 +27,7 @@ defmodule Faktory.Reporter do
   defp subscribe_to(config) do
     (1..config.concurrency)
     |> Enum.map(fn index ->
-      processor_name = Faktory.Registry.name({config.module, Faktory.Consumer, index})
+      processor_name = Faktory.Registry.name({config.module, Faktory.JobWorker, index})
       options = [max_demand: 1, min_demand: 0]
       {processor_name, options}
     end)

@@ -1,4 +1,4 @@
-defmodule Faktory.Consumer do
+defmodule Faktory.JobWorker do
   @moduledoc false
 
   defstruct [:config, :job_tasks]
@@ -44,7 +44,7 @@ defmodule Faktory.Consumer do
   end
 
   defp subscribe_to(config) do
-    producer_name = Faktory.Registry.name({config.module, Faktory.Producer})
+    producer_name = Faktory.Registry.name({config.module, Faktory.Fetcher})
     options = [max_demand: 1, min_demand: 0]
     [{producer_name, options}]
   end

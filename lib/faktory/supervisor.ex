@@ -17,15 +17,15 @@ defmodule Faktory.Supervisor do
     # TODO make the count configurable
     producers = Enum.map 1..1, fn index ->
       %{
-        id: {config.module, Faktory.Producer, index},
-        start: {Faktory.Producer, :start_link, [config]}
+        id: {config.module, Faktory.Fetcher, index},
+        start: {Faktory.Fetcher, :start_link, [config]}
       }
     end
 
     consumers = Enum.map 1..config.concurrency, fn index ->
       %{
-        id: {config.module, Faktory.Consumer, index},
-        start: {Faktory.Consumer, :start_link, [config, index]}
+        id: {config.module, Faktory.JobWorker, index},
+        start: {Faktory.JobWorker, :start_link, [config, index]}
       }
     end
 
