@@ -45,7 +45,7 @@ defmodule Faktory.Reporter do
     case Faktory.Protocol.ack(conn, jid) do
       {:ok, _jid} ->
         if_test do: send TestJidPidMap.get(jid), %{jid: jid, error: nil}
-        log("✓", job_task)
+        log("ACK 🥂", job_task)
       {:error, reason} ->
         warn_and_sleep(:ack, reason, error_count)
         ack(conn, job_task, error_count + 1) # Retry
@@ -61,7 +61,7 @@ defmodule Faktory.Reporter do
     case Faktory.Protocol.fail(conn, jid, errtype, message, trace) do
       {:ok, _jid} ->
         if_test do: send TestJidPidMap.get(jid), %{jid: jid, error: job_task.error}
-        log("✘", job_task)
+        log("FAIL 💥", job_task)
       {:error, reason} ->
         warn_and_sleep(:fail, reason, error_count)
         fail(conn, job_task, error_count + 1) # Retry

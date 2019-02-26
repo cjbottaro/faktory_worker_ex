@@ -5,9 +5,9 @@ defmodule Faktory.JobTask do
   def run(job, middleware) do
     jid = job["jid"]
     jobtype = job["jobtype"]
+    args = job["args"]
 
-    Faktory.Logger.debug "performing job #{inspect(job)}"
-    Faktory.Logger.info "S #{inspect self()} jid-#{jid} (#{jobtype})"
+    Faktory.Logger.info "START 🚀 #{inspect self()} jid-#{jid} (#{jobtype}) #{inspect args}"
 
     start_time = System.monotonic_time(:millisecond)
     {pid, _ref} = spawn_monitor(__MODULE__, :perform, [job, middleware])
