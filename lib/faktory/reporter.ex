@@ -27,9 +27,8 @@ defmodule Faktory.Reporter do
   defp subscribe_to(config) do
     (1..config.concurrency)
     |> Enum.map(fn index ->
-      processor_name = Faktory.Registry.name({config.module, Faktory.JobWorker, index})
-      options = [max_demand: 1, min_demand: 0]
-      {processor_name, options}
+      producer_name = Faktory.Registry.name({config.module, Faktory.JobWorker, index})
+      {producer_name, max_demand: 1, min_demand: 0}
     end)
   end
 
@@ -48,7 +47,7 @@ defmodule Faktory.Reporter do
         if_test do: send TestJidPidMap.get(jid), job_task
         log("✓", job_task)
       {:error, reason} ->
-        log_and_sleep(:ack, reason, error_count)
+        warn_and_sleep(:ack, reason, error_count)
         ack(conn, job_task, error_count + 1) # Retry
     end
   end
@@ -62,7 +61,7 @@ defmodule Faktory.Reporter do
     case Faktory.Protocol.fail(conn, jid, errtype, message, trace) do
       {:ok, _jid} -> log("✘", job_task)
       {:error, reason} ->
-        log_and_sleep(:fail, reason, error_count)
+        warn_and_sleep(:fail, reason, error_count)
         fail(conn, job_task, error_count + 1) # Retry
     end
   end
@@ -75,7 +74,7 @@ defmodule Faktory.Reporter do
     Faktory.Logger.info "#{status} #{inspect worker_pid} jid-#{jid} (#{jobtype}) #{time}s"
   end
 
-  defp log_and_sleep(op, reason, errors) do
+  defp warn_and_sleep(op, reason, errors) do
     reason = Utils.stringify(reason)
     sleep_time = Utils.exp_backoff(errors)
     Logger.warn("#{op} failure: #{reason} -- retrying in #{sleep_time/1000}s")

@@ -37,16 +37,13 @@ defmodule Faktory.JobWorker do
 
   def pop_job_task(pid, state) do
     job_task = Map.fetch!(state.job_tasks, pid) # If the key doesn't exist, we have seriously messed up.
-    state = update_in state.job_tasks, fn job_tasks ->
-      Map.delete(job_tasks, pid)
-    end
+    state = update_in(state.job_tasks, &Map.delete(&1, pid))
     {job_task, state}
   end
 
   defp subscribe_to(config) do
     producer_name = Faktory.Registry.name({config.module, Faktory.Fetcher})
-    options = [max_demand: 1, min_demand: 0]
-    [{producer_name, options}]
+    [{producer_name, max_demand: 1, min_demand: 0}]
   end
 
 end

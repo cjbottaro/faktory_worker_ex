@@ -32,18 +32,18 @@ defmodule Faktory.Fetcher do
   defp fetch(conn, queues, error_count \\ 0) do
     case Faktory.Protocol.fetch(conn, queues) do
       {:error, reason} ->
-        log_and_sleep(reason, error_count)
+        warn_and_sleep(reason, error_count)
         fetch(conn, queues, error_count + 1)
       nil -> fetch(conn, queues, 0)
       job -> job
     end
   end
 
-  defp log_and_sleep(:closed, error_count) do
-    log_and_sleep("connection closed", error_count)
+  defp warn_and_sleep(:closed, error_count) do
+    warn_and_sleep("connection closed", error_count)
   end
 
-  defp log_and_sleep(reason, error_count) do
+  defp warn_and_sleep(reason, error_count) do
     reason = normalize(reason)
     sleep_time = Faktory.Utils.exp_backoff(error_count)
     Faktory.Logger.warn("fetch failed: #{reason} -- retrying in #{sleep_time/1000}s")
