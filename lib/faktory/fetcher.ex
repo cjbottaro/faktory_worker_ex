@@ -5,8 +5,8 @@ defmodule Faktory.Fetcher do
 
   use GenStage
 
-  def start_link(config) do
-    name = Faktory.Registry.name({config.module, __MODULE__})
+  def start_link(config, index) do
+    name = Faktory.Registry.name({config.module, __MODULE__, index})
     GenStage.start_link(__MODULE__, config, name: name)
   end
 
@@ -26,6 +26,7 @@ defmodule Faktory.Fetcher do
     queues = state.config.queues
 
     job = fetch(conn, queues)
+    Faktory.Logger.debug "#{inspect self()} fetched job: #{inspect job}"
     {:noreply, [job], state}
   end
 

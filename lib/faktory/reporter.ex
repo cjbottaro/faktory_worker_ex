@@ -8,8 +8,8 @@ defmodule Faktory.Reporter do
   alias Faktory.{Utils, Logger}
   import Utils, only: [if_test: 1]
 
-  def start_link(config) do
-    name = Faktory.Registry.name({config.module, __MODULE__})
+  def start_link(config, index) do
+    name = Faktory.Registry.name({config.module, __MODULE__, index})
     GenStage.start_link(__MODULE__, config, name: name)
   end
 
@@ -19,8 +19,8 @@ defmodule Faktory.Reporter do
     {:consumer, state, subscribe_to: subscribe_to(config)}
   end
 
-  def handle_events([job_task], _from, state) do
-    report(state.conn, job_task)
+  def handle_events([report], _from, state) do
+    report(state.conn, report)
     {:noreply, [], state}
   end
 
@@ -32,47 +32,47 @@ defmodule Faktory.Reporter do
     end)
   end
 
-  defp report(conn, job_task) do
-    case job_task do
-      %{error: nil} -> ack(conn, job_task)
-      %{error: _error} -> fail(conn, job_task)
+  defp report(conn, report) do
+    case report do
+      %{error: nil} -> ack(conn, report)
+      %{error: _error} -> fail(conn, report)
     end
   end
 
-  defp ack(conn, job_task, error_count \\ 0) do
-    jid = job_task.job["jid"]
+  defp ack(conn, report, error_count \\ 0) do
+    jid = report.job["jid"]
 
     case Faktory.Protocol.ack(conn, jid) do
       {:ok, _jid} ->
         if_test do: send TestJidPidMap.get(jid), %{jid: jid, error: nil}
-        log("SUCCESS 🥂", job_task)
+        log("SUCCESS 🥂", report)
       {:error, reason} ->
         warn_and_sleep(:ack, reason, error_count)
-        ack(conn, job_task, error_count + 1) # Retry
+        ack(conn, report, error_count + 1) # Retry
     end
   end
 
-  defp fail(conn, job_task, error_count \\ 0) do
-    jid = job_task.job["jid"]
-    errtype = job_task.error.errtype
-    message = job_task.error.message
-    trace   = job_task.error.trace
+  defp fail(conn, report, error_count \\ 0) do
+    jid = report.job["jid"]
+    errtype = report.error.errtype
+    message = report.error.message
+    trace   = report.error.trace
 
     case Faktory.Protocol.fail(conn, jid, errtype, message, trace) do
       {:ok, _jid} ->
-        if_test do: send TestJidPidMap.get(jid), %{jid: jid, error: job_task.error}
-        log("FAILURE 💥", job_task)
+        if_test do: send TestJidPidMap.get(jid), %{jid: jid, error: report.error}
+        log("FAILURE 💥", report)
       {:error, reason} ->
         warn_and_sleep(:fail, reason, error_count)
-        fail(conn, job_task, error_count + 1) # Retry
+        fail(conn, report, error_count + 1) # Retry
     end
   end
 
-  defp log(status, job_task) do
-    jid = job_task.job["jid"]
-    jobtype = job_task.job["jobtype"]
-    worker_pid = job_task.worker_pid
-    time = elapsed(job_task.start_time)
+  defp log(status, report) do
+    jid = report.job["jid"]
+    jobtype = report.job["jobtype"]
+    worker_pid = report.worker_pid
+    time = elapsed(report.start_time)
     Faktory.Logger.info "#{status} #{inspect worker_pid} jid-#{jid} (#{jobtype}) #{time}s"
   end
 

@@ -15,14 +15,14 @@ defmodule Faktory.Supervisor do
     }
 
     # TODO make the count configurable
-    producers = Enum.map 1..1, fn index ->
+    fetchers = Enum.map 1..config.fetcher_count, fn index ->
       %{
         id: {config.module, Faktory.Fetcher, index},
-        start: {Faktory.Fetcher, :start_link, [config]}
+        start: {Faktory.Fetcher, :start_link, [config, index]}
       }
     end
 
-    consumers = Enum.map 1..config.concurrency, fn index ->
+    job_workers = Enum.map 1..config.concurrency, fn index ->
       %{
         id: {config.module, Faktory.JobWorker, index},
         start: {Faktory.JobWorker, :start_link, [config, index]}
@@ -30,14 +30,14 @@ defmodule Faktory.Supervisor do
     end
 
     # TODO make the count configurable
-    reporters = Enum.map 1..1, fn index ->
+    reporters = Enum.map 1..config.reporter_count, fn index ->
       %{
         id: {config.module, Faktory.Reporter, index},
-        start: {Faktory.Reporter, :start_link, [config]}
+        start: {Faktory.Reporter, :start_link, [config, index]}
       }
     end
 
-    children = [heartbeat | producers ++ consumers ++ reporters]
+    children = [heartbeat | fetchers ++ job_workers ++ reporters]
     Supervisor.init(children, strategy: :one_for_one)
   end
 
