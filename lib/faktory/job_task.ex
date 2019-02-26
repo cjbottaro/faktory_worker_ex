@@ -1,33 +1,26 @@
 defmodule Faktory.JobTask do
   @moduledoc false
-  defstruct [:config, :job, :report_queue, :task, :start_time]
+  defstruct [:job, :worker_pid, :pid, :start_time, :error]
 
-  def run(state) do
-    log(:start, state)
-
-    state = %{state |
-      task: Task.async(__MODULE__, :perform, [state]),
-      start_time: System.monotonic_time(:millisecond)
-    }
-
-    # That process that is calling this function needs to trap
-    # exits so that the catch clause in the try block works.
-
-    try do
-      Task.await(state.task, :infinity)
-    catch
-      :exit, reason -> handle_exit(state, reason)
-    else
-      _ -> ack(state)
-    end
-  end
-
-  def perform(state) do
-    job = state.job
-    middleware = state.config.middleware
+  def run(job, middleware) do
+    jid = job["jid"]
+    jobtype = job["jobtype"]
 
     Faktory.Logger.debug "performing job #{inspect(job)}"
+    Faktory.Logger.info "S #{inspect self()} jid-#{jid} (#{jobtype})"
 
+    start_time = System.monotonic_time(:millisecond)
+    {pid, _ref} = spawn_monitor(__MODULE__, :perform, [job, middleware])
+
+    %__MODULE__{
+      start_time: start_time,
+      worker_pid: self(),
+      pid: pid,
+      job: job
+    }
+  end
+
+  def perform(job, middleware) do
     Faktory.Middleware.traverse(job, middleware, fn job ->
       try do
         Module.safe_concat(Elixir, job["jobtype"])
@@ -44,9 +37,9 @@ defmodule Faktory.JobTask do
     task_pid = state.task.pid
 
     # Clear out our mailbox
-    receive do
-      {:EXIT, ^task_pid, ^reason} -> nil
-    end
+    # receive do
+    #   {:EXIT, ^task_pid, ^reason} -> nil
+    # end
 
     error = Faktory.Error.from_reason(reason)
     fail(state, error)
@@ -54,14 +47,12 @@ defmodule Faktory.JobTask do
 
   defp ack(state) do
     log(:ack, state)
-    item = {:ack, state.job["jid"]}
-    BlockingQueue.push(state.report_queue, item)
+    {:ack, state.job["jid"]}
   end
 
   defp fail(state, error) do
     log(:fail, state)
-    item = {:fail, state.job["jid"], error}
-    BlockingQueue.push(state.report_queue, item)
+    {:fail, state.job["jid"], error}
   end
 
   defp log(type, state) do

@@ -14,18 +14,6 @@ defmodule Faktory.Supervisor do
       start: {Faktory.Heartbeat, :start_link, [config]}
     }
 
-    name = Faktory.Registry.name(config.module, :job_queue)
-    job_queue = %{
-      id: {config.module, :job_queue},
-      start: {BlockingQueue, :start_link, [config.concurrency, [name: name]]}
-    }
-
-    name = Faktory.Registry.name(config.module, :report_queue)
-    report_queue = %{
-      id: {config.module, :report_queue},
-      start: {BlockingQueue, :start_link, [config.concurrency * 3, [name: name]]}
-    }
-
     # TODO make the count configurable
     producers = Enum.map 1..1, fn index ->
       %{
@@ -37,7 +25,7 @@ defmodule Faktory.Supervisor do
     consumers = Enum.map 1..config.concurrency, fn index ->
       %{
         id: {config.module, Faktory.Consumer, index},
-        start: {Faktory.Consumer, :start_link, [config]}
+        start: {Faktory.Consumer, :start_link, [config, index]}
       }
     end
 
@@ -49,13 +37,7 @@ defmodule Faktory.Supervisor do
       }
     end
 
-    children = [
-      heartbeat,
-      job_queue,
-      report_queue
-      | producers ++ consumers ++ reporters
-    ]
-
+    children = [heartbeat | producers ++ consumers ++ reporters]
     Supervisor.init(children, strategy: :one_for_one)
   end
 

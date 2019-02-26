@@ -1,26 +1,52 @@
 defmodule Faktory.Consumer do
   @moduledoc false
 
-  def start_link(config) do
-    Task.start_link(__MODULE__, :run, [config])
+  defstruct [:config, :job_tasks]
+
+  use GenStage
+
+  def start_link(config, index) do
+    name = Faktory.Registry.name({config.module, __MODULE__, index})
+    GenStage.start_link(__MODULE__, config, name: name)
   end
 
-  def run(config) do
-    Process.flag(:trap_exit, true) # The secret sauce.
-
-    job_queue = Faktory.Registry.name(config.module, :job_queue)
-    report_queue = Faktory.Registry.name(config.module, :report_queue)
-
-    Stream.repeatedly(fn -> BlockingQueue.pop(job_queue) end)
-    |> Enum.each(&process(&1, config, report_queue))
+  def init(config) do
+    # Process.flag(:trap_exit, true) # The secret sauce.
+    state = %__MODULE__{config: config, job_tasks: %{}}
+    {:producer_consumer, state, subscribe_to: subscribe_to(config)}
   end
 
-  def process(job, config, report_queue) do
-    %Faktory.JobTask{
-      job: job,
-      config: config,
-      report_queue: report_queue
-    } |> Faktory.JobTask.run
+  def handle_events([job], _from, state) do
+    job_task = Faktory.JobTask.run(job, state.config.middleware)
+    state = update_in state.job_tasks, fn job_tasks ->
+      Map.put(job_tasks, job_task.pid, job_task)
+    end
+    {:noreply, [], state}
+  end
+
+  def handle_info({:DOWN, _ref, :process, pid, :normal}, state) do
+    {job_task, state} = pop_job_task(pid, state)
+    {:noreply, [job_task], state}
+  end
+
+  def handle_info({:DOWN, _ref, :process, pid, reason}, state) do
+    {job_task, state} = pop_job_task(pid, state)
+    job_task = %{job_task | error: Faktory.Error.from_reason(reason)}
+    {:noreply, [job_task], state}
+  end
+
+  def pop_job_task(pid, state) do
+    job_task = Map.fetch!(state.job_tasks, pid) # If the key doesn't exist, we have seriously messed up.
+    state = update_in state.job_tasks, fn job_tasks ->
+      Map.delete(job_tasks, pid)
+    end
+    {job_task, state}
+  end
+
+  defp subscribe_to(config) do
+    producer_name = Faktory.Registry.name({config.module, Faktory.Producer})
+    options = [max_demand: 1, min_demand: 0]
+    [{producer_name, options}]
   end
 
 end

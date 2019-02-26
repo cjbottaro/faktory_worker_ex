@@ -48,7 +48,7 @@ defmodule Faktory.Mixfile do
       {:poison, "~> 3.1"},
       {:poolboy, "~> 1.5"},
       {:socket, "~> 0.3"},
-      {:blocking_queue, "~> 1.0"},
+      {:gen_stage, "~> 0.14"},
       {:ex_doc, "~> 0.19", only: :dev},
       {:mox, "~> 0.3", only: :test},
     ]
@@ -64,7 +64,7 @@ defmodule Faktory.Mixfile do
 
   defp aliases do
     [
-      compile: ["compile --warnings-as-errors"]
+      # compile: ["compile --warnings-as-errors"]
     ]
   end
 end
