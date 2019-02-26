@@ -68,7 +68,7 @@ defmodule Faktory do
     end)
 
     %{ "jid" => jid, "args" => args } = job
-    Logger.debug "QUEUE 🕒 #{inspect self()} jid-#{jid} (#{jobtype}) #{inspect(args)}"
+    Logger.info "QUEUE 🕒 #{inspect self()} jid-#{jid} (#{jobtype}) #{inspect(args)}"
 
     job
   end
