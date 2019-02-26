@@ -11,7 +11,6 @@ defmodule Faktory.JobWorker do
   end
 
   def init(config) do
-    # Process.flag(:trap_exit, true) # The secret sauce.
     state = %__MODULE__{config: config, job_tasks: %{}}
     {:producer_consumer, state, subscribe_to: subscribe_to(config)}
   end
@@ -35,7 +34,7 @@ defmodule Faktory.JobWorker do
     {:noreply, [job_task], state}
   end
 
-  def pop_job_task(pid, state) do
+  defp pop_job_task(pid, state) do
     job_task = Map.fetch!(state.job_tasks, pid) # If the key doesn't exist, we have seriously messed up.
     state = update_in(state.job_tasks, &Map.delete(&1, pid))
     {job_task, state}
