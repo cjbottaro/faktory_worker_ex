@@ -24,8 +24,8 @@ defmodule Faktory.Supervisor do
 
     job_workers = Enum.map 1..config.concurrency, fn index ->
       %{
-        id: {config.module, Faktory.JobWorker, index},
-        start: {Faktory.JobWorker, :start_link, [config, index]}
+        id: {config.module, Faktory.Runner, index},
+        start: {Faktory.Runner, :start_link, [config, index]}
       }
     end
 

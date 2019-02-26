@@ -1,4 +1,4 @@
-defmodule Faktory.JobWorker do
+defmodule Faktory.Runner do
   @moduledoc false
 
   use GenStage
