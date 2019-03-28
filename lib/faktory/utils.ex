@@ -6,30 +6,6 @@ defmodule Faktory.Utils do
 
   def app_name, do: @app_name
 
-  def put_unless_nil(enum, _key, nil), do: enum
-  def put_unless_nil(enum, key, value) when is_list(enum) do
-    Keyword.put(enum, key, value)
-  end
-  def put_unless_nil(enum, key, value) when is_map(enum) do
-    Map.put(enum, key, value)
-  end
-
-  def default_from_key(enum, dst, src) when is_list(enum) do
-    if enum[dst] do
-      enum
-    else
-      Keyword.put(enum, dst, enum[src])
-    end
-  end
-
-  def default_from_key(enum, dst, src) when is_map(enum) do
-    if Map.get(enum, dst) do
-      enum
-    else
-      Map.put(enum, dst, Map.get(enum, src))
-    end
-  end
-
   def module_name(string) when is_binary(string) do
     String.replace_prefix(string, "Elixir.", "")
   end
@@ -104,6 +80,15 @@ defmodule Faktory.Utils do
   def hostname do
     {:ok, hostname} = :inet.gethostname
     to_string(hostname)
+  end
+
+  def exp_backoff(count) do
+    time = (:math.pow(1.4, count) + :rand.uniform) * 1000 |> round
+    if time > 32_000 do
+      32_000 + (:rand.uniform * 1000 |> round)
+    else
+      time
+    end
   end
 
 end

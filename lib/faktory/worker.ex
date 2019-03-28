@@ -1,182 +1,164 @@
 defmodule Faktory.Worker do
-  @moduledoc false
-  use GenServer
+  @moduledoc """
+  Create and configure a worker for _processing_ jobs.
 
-  alias Faktory.{Logger, Protocol, Executor}
-  import Faktory.Utils, only: [now_in_ms: 0, if_test: 1]
+  It works exatly the same as configuring an Ecto Repo.
 
-  def start_link(config) do
-    GenServer.start_link(__MODULE__, config)
+  ```elixir
+  defmodule MyFaktoryWorker do
+    use Faktory.Worker, otp_app: :my_app
   end
 
-  def init(config) do
-    Process.flag(:trap_exit, true)
+  # It must be added to your app's supervision tree
+  defmodule MyApp.Application do
+    use Application
 
-    # Queue up our mailbox.
-    GenServer.cast(self(), :next)
-
-    # Get our state in order.
-    state = Map.merge(config, %{
-      job: nil,
-      worker_pid: nil,
-      error: nil,
-      start_time: nil,
-    })
-
-    # Things are ok!
-    {:ok, state}
-  end
-
-  # This is the main loop. Fetch a job, execute the job, repeat.
-  def handle_cast(:next, state) do
-    state = state
-      |> fetch
-      |> execute
-    {:noreply, state}
-  end
-
-  # If the worker process errors, it reports its stacktrace to us before ending.
-  def handle_call({:error_report, error}, {from, _ref}, %{worker_pid: worker_pid} = state)
-  when from == worker_pid do
-    Logger.debug("Worker reported an error...\n#{format_error(error)}")
-    {:reply, :ok, %{state | error: error}}
-  end
-
-  # This gets triggered when the worker process ends. At this point we either
-  # have a successully run job or a failure. Either way, we need to restart
-  # the main loop.
-  def handle_info({:EXIT, pid, :normal}, %{worker_pid: worker_pid} = state)
-  when pid == worker_pid do
-    Logger.debug("Worker stopped :normal")
-    case state do
-      %{error: nil} -> report_ack(state)
-      %{error: _error} -> report_fail(state)
+    def start(_type, _args) do
+      children = [MyFaktoryWorker]
+      Supervisor.start_link(children, strategy: :one_for_one)
     end
-    {:noreply, next(state)}
   end
+  ```
 
-  def handle_info({:EXIT, pid, :killed}, %{worker_pid: worker_pid} = state)
-  when pid == worker_pid do
-    Logger.debug("Worker stopped :killed")
+  ## Defaults
 
-    report_fail(%{state | error: {"killed", "", ""}})
+  See `defaults/0` for default worker configuration.
 
-    {:noreply, next(state)}
-  end
+  ## Compile time config
 
-  def handle_info({:EXIT, pid, reason}, %{worker_pid: worker_pid} = state)
-  when pid == worker_pid do
-    Logger.debug("Worker stopped :exit")
+  Done with Mix.Config, duh.
 
-    # reason is some Erlang tuple. Luckily, Elixir gives us some functions to
-    # format it into an exception with trace. Unfortunately, it's a string and
-    # we have to parse it into {errtype, message, trace}.
-    error = Exception.format_exit(reason) |> parse_format_exit
+  ```elixir
+  use Mix.Config
 
-    report_fail(%{state | error: error})
+  config :my_app, MyFaktoryWorker,
+    host: "foo.bar",
+    concurrency: 15
+    queues: ["default", "other_queue"]
+  ```
 
-    {:noreply, next(state)}
-  end
+  ## Runtime config
 
-  # Either update state.job to be a map, or nil if no job was available.
-  def fetch(%{queues: queues} = state) do
-    %{state | job: with_conn(state, &Protocol.fetch(&1, queues))}
-  end
+  Can be done with the `c:init/1` callback.
 
-  # If no job was fetched, then start the main loop over again.
-  def execute(%{job: nil} = state) do
-    next(state)
-  end
+  Can be done with environment variable tuples:
+  ```elixir
+  use Mix.Config
 
-  # If we have a job, then run it in a separate, monitored process and just wait.
-  def execute(%{job: job} = state) do
-    {:ok, worker_pid} = Executor.start_link(self(), state.middleware)
-    GenServer.cast(worker_pid, {:run, job})
+  config :my_app, MyFaktoryWorker,
+    host: {:system, "FAKTORY_HOST"} # No default, errors if FAKTORY_HOST doesn't exist
+    port: {:system, "FAKTORY_PORT", 1001} # Use 1001 if FAKTORY_PORT doesn't exist
+  ```
+  """
 
-    %{"jid" => jid, "jobtype" => jobtype, "args" => args} = job
-    Logger.info("S #{inspect(self())} jid-#{jid} (#{jobtype}) #{inspect(args)}")
+  @defaults [
+    host: "localhost",
+    port: 7419,
+    middleware: [],
+    concurrency: 20,
+    queues: ["default"],
+    password: nil,
+    use_tls: false
+  ]
 
-    %{state | worker_pid: worker_pid, start_time: now_in_ms()}
-  end
+  @doc """
+  Return the default worker configuration.
 
-  # Reset some state and trigger the main loop again.
-  def next(state) do
-    GenServer.cast(self(), :next)
-    %{state | job: nil, worker_pid: nil, error: nil, start_time: nil}
-  end
+  ```elixir
+  iex(1)> Faktory.Worker.defaults
+  [
+    host: "localhost",
+    port: 7419,
+    middleware: [],
+    concurrency: 20,
+    queues: ["default"],
+    password: nil,
+    use_tls: false
+  ]
+  ```
+  """
+  def defaults, do: @defaults
 
-  defp report_ack(%{job: job, start_time: start_time} = state) do
-    jid = job["jid"]
-    jobtype = job["jobtype"]
-    time = elapsed(start_time)
+  defmacro __using__(options) do
+    quote do
 
-    Logger.info("✓ #{inspect(self())} jid-#{jid} (#{jobtype}) #{time}s")
+      @otp_app unquote(options[:otp_app])
+      def otp_app, do: @otp_app
 
-    {:ok, _} = with_conn(state, &Protocol.ack(&1, jid))
-    Logger.debug("ack'ed #{jid}")
+      def init(config), do: config
+      defoverridable [init: 1]
 
-    if_test do
-      send TestJidPidMap.get(jid), {:report_ack, %{job: job, time: time}}
+      def type, do: :worker
+      def client?, do: false
+      def worker?, do: true
+
+      def config, do: Faktory.Worker.config(__MODULE__)
+      def child_spec(options \\ []), do: Faktory.Worker.child_spec(__MODULE__, options)
+
     end
   end
 
-  defp report_fail(%{job: job, error: error, start_time: start_time} = state) do
-    jid = job["jid"]
-    jobtype = job["jobtype"]
-    time = elapsed(start_time)
+  @doc """
+  Callback for doing runtime configuration.
 
-    Logger.info("✘ #{inspect(self())} jid-#{jid} (#{jobtype}) #{time}s")
+  ```
+  defmodule MyFaktoryWorker do
+    use Faktory.Worker, otp_app: :my_app
 
-    {errtype, message, trace} = error
-    trace = String.split(trace, "\n")
-    {:ok, _} = with_conn(state, &Protocol.fail(&1, jid, errtype, message, trace))
-    Logger.debug("fail'ed #{jid}")
-
-    if_test do
-      send TestJidPidMap.get(jid), {:report_fail, %{job: job, time: time, error: error}}
+    def init(config) do
+      config
+      |> Keyword.put(:host, "foo.bar")
+      |> Keyword.merge(queues: ["default", "other_queue"], concurrency: 10)
     end
   end
+  ```
+  """
+  @callback init(config :: Keyword.t) :: Keyword.t
 
-  defp format_error({errtype, message, trace}) do
-    "(#{errtype}) #{message}\n#{trace}"
+  @doc """
+  Returns a worker's config after all runtime modifications have occurred.
+
+  ```elixir
+  iex(1)> MyFaktoryWorker.config
+  [
+    wid: "a2ba187ec640215f",
+    host: "localhost",
+    port: 7419,
+    middleware: [],
+    concurrency: 20,
+    queues: ["default"],
+    password: nil,
+    use_tls: false
+  ]
+  ```
+
+  Don't mess with the `wid`. 🤨
+  """
+  @callback config :: Keyword.t
+
+  @doc false
+  def config(module) do
+    Faktory.Configuration.call(module, @defaults)
   end
 
-  defp elapsed(t) do
-    ((now_in_ms() - t) / 1000) |> Float.round(3)
+  @doc false
+  def child_spec(module, options) do
+    child_spec(module, options, Faktory.start_workers?)
   end
 
-  defp with_conn(%{module: pool} = state, f) do
-    try do
-      :poolboy.transaction(pool, f)
-    catch
-      :exit, {:timeout, _} ->
-        Logger.warn("connection pool timeout")
-        with_conn(state, f)
-    end
+  @doc false
+  def child_spec(module, _options, false) do
+    %{
+      id: module,
+      start: {Task, :start_link, [fn -> Process.sleep(:infinity) end]}
+    }
   end
 
-
-  # string looks like this:
-  # Task #PID<0.227.0> started from #PID<0.226.0> terminating
-  # ** (ArithmeticError) bad argument in arithmetic expression
-  #   (faktory_worker_ex) test/support/die_worker.ex:8: anonymous fn/0 in DieWorker.perform/1
-  #   (elixir) lib/task/supervised.ex:85: Task.Supervised.do_apply/2
-  #   (stdlib) proc_lib.erl:247: :proc_lib.init_p_do_apply/3
-  defp parse_format_exit(string) do
-    try do
-      [_, banner | trace] = String.split(string, "\n")
-        |> Enum.map(&String.trim/1)
-      [_, errtype, message | []] = String.split(banner, " ", parts: 3)
-      errtype = errtype
-        |> String.trim_leading("(")
-        |> String.trim_trailing(")")
-      trace = Enum.join(trace, "\n")
-      {errtype, message, trace}
-    rescue
-      _ ->
-        Logger.error("Failed to parse error message:\n#{string}")
-        {"<internal_error>", "see logs", ""}
-    end
+  def child_spec(module, _options, true) do
+    %{
+      id: module,
+      start: {Faktory.Supervisor, :start_link, [module]},
+      type: :supervisor
+    }
   end
-
 end

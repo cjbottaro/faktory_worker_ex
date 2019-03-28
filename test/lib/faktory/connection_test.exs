@@ -6,7 +6,7 @@ defmodule Faktory.ConnectionTest do
 
   setup :verify_on_exit!
 
-  test "handshake!" do
+  test "handshake" do
     hi = "+HI"
       <> Poison.encode!(%{v: 2})
       <> "\r\n"
@@ -19,24 +19,29 @@ defmodule Faktory.ConnectionTest do
         hostname: Utils.hostname})
       <> "\r\n"
 
-    Faktory.Tcp.Mock
+    Faktory.SocketMock
     |> expect(:connect, fn _ -> {:ok, nil} end)
-    |> expect(:setup_size, fn _, :line -> 0 end)
-    |> expect(:recv, fn _, 0 -> {:ok, hi} end)
+    |> expect(:recv, fn _, :line, _ -> {:ok, hi} end)
     |> expect(:send, fn _, data -> assert data == hello; :ok end)
-    |> expect(:recv, fn _, 0 -> {:ok, "+OK\r\n"} end)
+    |> expect(:recv, fn _, :line, _ -> {:ok, "+OK"} end)
 
     parent = self()
 
     {:ok, _pid} = Connection.start_link(%{
-      tcp: Faktory.Tcp.Mock,
-      on_init: (fn -> allow(Faktory.Tcp.Mock, parent, self()) end),
+      socket_impl: Faktory.SocketMock,
+      on_init: (fn -> allow(Faktory.SocketMock, parent, self()) end),
+      on_connect: (fn -> send(parent, :connected) end),
       host: nil,
       port: nil,
       use_tls: false,
       wid: "123abc",
       password: nil
     })
+
+    receive do
+      :connected -> nil
+    end
+
   end
 
 end

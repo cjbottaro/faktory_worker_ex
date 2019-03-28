@@ -3,7 +3,7 @@ defmodule Faktory.Application do
   use Application
 
   def start(_type, _args) do
-    Faktory.Configuration.init
-    Faktory.Supervisor.start_link
+    children = [Faktory.Registry]
+    Supervisor.start_link(children, strategy: :one_for_one)
   end
 end

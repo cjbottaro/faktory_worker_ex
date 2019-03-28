@@ -2,6 +2,7 @@ defmodule Faktory.Connection do
   @moduledoc false
   use Connection
   alias Faktory.Logger
+  import Faktory.Utils, only: [if_test: 1]
 
   @default_timeout 4000
 
@@ -13,7 +14,7 @@ defmodule Faktory.Connection do
     Connection.call(conn, {:send, data})
   end
 
-  def recv(conn, size \\ :line) do
+  def recv(conn, size) do
     Connection.call(conn, {:recv, size})
   end
 
@@ -22,22 +23,47 @@ defmodule Faktory.Connection do
   end
 
   def init(config) do
-    Map.get(config, :on_init, fn -> nil end).() # Aid testing.
+    config = Map.new(config)
 
-    config
-      |> Map.put(:socket, nil)
-      |> Map.put_new(:tcp, Faktory.Tcp)
-      |> do_connect
+    state = config
+    |> Map.put_new(:socket_impl, Faktory.Socket)
+    |> Map.put_new(:use_tls, false)
+    |> Map.put_new(:password, nil)
+    |> Map.put(:socket, nil)
+
+    # Aid testing.
+    if_test do: state[:on_init] && state[:on_init].()
+
+    {:connect, :init, state}
   end
 
-  def connect(:backoff, state), do: do_connect(state)
+  def connect(context, state) do
+    with \
+      {:ok, socket} <- socket_connect(state),
+      state = %{state | socket: socket},
+      :ok <- handshake(state)
+    do
+      log_connect(context, state)
+      if_test do: state[:on_connect] && state[:on_connect].()
+      {:ok, state}
+    else
+      {:error, reason} ->
+        %{host: host, port: port} = state
+        reason = :inet.format_error(reason)
+        Logger.warn("Connection failed to #{host}:#{port} (#{reason})")
+        {:backoff, 1000, state}
+    end
+  end
 
   def disconnect(info, state) do
     # Pull out variables.
-    %{tcp: tcp, socket: socket, host: host, port: port} = state
+    %{host: host, port: port} = state
 
     # Close the damn thing.
-    :ok = tcp.close(socket)
+    :ok = socket_close(state)
+
+    # Remove socket from state.
+    state = %{state | socket: nil}
 
     case info do
       # Terminate normally.
@@ -45,18 +71,14 @@ defmodule Faktory.Connection do
         Connection.reply(from, :ok)
         {:stop, :normal, %{state | socket: nil}}
       # Reconnect.
-      {:error, :closed} ->
-        Logger.warn("Connection closed to #{host}:#{port}")
-        {:connect, :backoff, %{state | socket: nil}}
-      # Reconnect.
       {:error, reason} ->
         reason = :inet.format_error(reason)
-        Logger.warn("Connection error on #{host}:#{port} (#{reason})")
+        Logger.warn("Disconnected #{host}:#{port} (#{reason})")
         {:connect, :backoff, %{state | socket: nil}}
     end
   end
 
-  def handle_call(_, _, %{socket: nil} = state) do
+  def handle_call(_msg, _from, %{socket: nil} = state) do
     {:reply, {:error, :closed}, state}
   end
 
@@ -64,71 +86,53 @@ defmodule Faktory.Connection do
     {:disconnect, {:close, from}, state}
   end
 
-  def handle_call({:send, data}, _from, %{tcp: tcp, socket: socket} = state) do
-    case tcp.send(socket, data) do
+  def handle_call({:send, data}, _from, state) do
+    case socket_send(state, data) do
       :ok -> {:reply, :ok, state}
       {:error, _} = error -> {:disconnect, error, error, state}
     end
   end
 
-  def handle_call({:recv, size}, _, %{tcp: tcp, socket: socket} = state) do
-    size = tcp.setup_size(socket, size)
-
-    case tcp.recv(socket, size, @default_timeout) do
-      {:ok, data} ->
-        data = cleanup_data(data, size)
-        {:reply, {:ok, data}, state}
-      {:error, :timeout} = timeout ->
-        {:reply, timeout, state}
-      {:error, _} = error ->
-        {:disconnect, error, error, state}
+  def handle_call({:recv, size}, _, state) do
+    case socket_recv(state, size, timeout: @default_timeout) do
+      {:ok, _data} = result -> {:reply, result, state}
+      {:error, :timeout} = timeout -> {:reply, timeout, state}
+      {:error, _reason} = error -> {:disconnect, error, error, state}
     end
   end
 
-  defp do_connect(state) do
-    %{host: host, port: port, tcp: tcp} = state
-
-    case tcp.connect(state) do
-      {:ok, socket} ->
-        state = %{state | socket: socket}
-        handshake!(state)
-        %{host: host, port: port} = state
-        Logger.info("Connection established to #{host}:#{port}")
-        {:ok, state}
-      {:error, error} ->
-        Logger.warn("Connection failed to #{host}:#{port} (#{error})")
-        {:backoff, 1000, state}
+  defp handshake(state) do
+    with \
+      {:ok, <<"+HI", rest::binary>>} <- socket_recv(state, :line),
+      {:ok, server_config} <- Poison.decode(rest),
+      server_version = server_config["v"],
+      password_opts = password_opts(state.password, server_config),
+      payload = hello_payload(state, password_opts),
+      :ok <- socket_send(state, "HELLO #{payload}"),
+      {:ok, "+OK"} <- socket_recv(state, :line)
+    do
+      if server_version > 2 do
+        Logger.warn("Warning: Faktory server protocol #{server_version} in use, but this worker doesn't speak that version")
+      end
+      :ok
     end
   end
 
-  defp handshake!(state) do
+  defp hello_payload(state, password_opts) do
     alias Faktory.Utils
-
-    %{tcp: tcp, socket: socket, wid: wid, password: password} = state
-
-    tcp.setup_size(socket, :line)
-    {:ok, <<"+HI", rest::binary>>} = tcp.recv(socket, 0)
-
-    server_config = Poison.decode!(rest)
-    server_version = server_config["v"]
-
-    if server_version > 2 do
-      Logger.warn("Warning: Faktory server protocol #{server_version} in use, but this worker doesn't speak that version")
-    end
-
-    payload = %{
-      wid: wid,
+    %{
       hostname: Utils.hostname,
       pid: Utils.unix_pid,
       labels: ["elixir"],
       v: 2,
     }
-    |> Map.merge(password_opts(password, server_config))
+    |> add_wid(state) # Client connection don't have wid
+    |> Map.merge(password_opts)
     |> Poison.encode!
-
-    :ok = tcp.send(socket, "HELLO #{payload}\r\n")
-    {:ok, "+OK\r\n"} = tcp.recv(socket, 0)
   end
+
+  defp add_wid(payload, %{wid: wid}), do: Map.put(payload, :wid, wid)
+  defp add_wid(payload, _), do: payload
 
   defp password_opts(nil, %{"s" => _salt}), do: raise "This server requires a password, but a password hasn't been configured"
 
@@ -138,8 +142,43 @@ defmodule Faktory.Connection do
 
   defp password_opts(_password, _server_config), do: %{}
 
-  # If size is 0, then we requested a whole line, so we chomp it.
-  defp cleanup_data(data, 0), do: String.replace_suffix(data, "\r\n", "")
-  defp cleanup_data(data, _), do: data
+  defp socket_connect(state) do
+    %{socket_impl: socket_impl, host: host, port: port, use_tls: use_tls} = state
+    case use_tls do
+      true -> socket_impl.connect("ssl://#{host}:#{port}")
+      false -> socket_impl.connect("tcp://#{host}:#{port}")
+    end
+  end
+
+  defp socket_close(state) do
+    state.socket_impl.close(state.socket)
+  end
+
+  defp socket_send(state, data) do
+    state.socket_impl.send(state.socket, chomp(data) <> "\r\n")
+  end
+
+  defp socket_recv(state, size, options \\ [])
+
+  defp socket_recv(state, :line, options) do
+    case state.socket_impl.recv(state.socket, :line, options) do
+      {:ok, line} -> {:ok, chomp(line)}
+      error -> error
+    end
+  end
+
+  defp socket_recv(state, size, options) do
+    state.socket_impl.recv(state.socket, size, options)
+  end
+
+  defp log_connect(:init, %{host: host, port: port}) do
+    Logger.debug "Connection established to #{host}:#{port}"
+  end
+
+  defp log_connect(context, %{host: host, port: port}) do
+    Logger.info  "Connection reestablished to #{host}:#{port} (#{context})"
+  end
+
+  defp chomp(string), do: String.replace_suffix(string, "\r\n", "")
 
 end
