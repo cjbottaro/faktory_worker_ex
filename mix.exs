@@ -1,7 +1,7 @@
 defmodule Faktory.Mixfile do
   use Mix.Project
 
-  @version "0.5.0"
+  @version "0.7.0"
 
   def project do
     [
@@ -47,8 +47,9 @@ defmodule Faktory.Mixfile do
       {:connection, "~> 1.0"},
       {:poison, "~> 3.1"},
       {:poolboy, "~> 1.5"},
-      {:ex_doc, "~> 0.18.1", only: :dev},
-      {:certifi, "~> 2.0"},
+      {:socket, "~> 0.3"},
+      {:blocking_queue, "~> 1.0"},
+      {:ex_doc, "~> 0.19", only: :dev},
       {:mox, "~> 0.3", only: :test},
     ]
   end
@@ -63,7 +64,7 @@ defmodule Faktory.Mixfile do
 
   defp aliases do
     [
-      "compile": ["compile --warnings-as-errors"]
+      compile: ["compile --warnings-as-errors"]
     ]
   end
 end

@@ -9,7 +9,7 @@ defmodule Faktory do
   # A connection to the Faktory server.
   @type conn :: pid
 
-  alias Faktory.{Logger, Protocol, Utils, Configuration}
+  alias Faktory.{Logger, Protocol, Utils}
 
   defdelegate app_name, to: Utils
   defdelegate env, to: Utils
@@ -38,15 +38,15 @@ defmodule Faktory do
 
     module = Module.safe_concat([module])
     options = Keyword.merge(module.faktory_options, options)
-    client = options[:client] || Configuration.default_client
+    client = options[:client] || get_env(:default_client)
+    jobtype = options[:jobtype]
 
-    if !Configuration.exists?(client) do
-      name = Faktory.Utils.module_name(client)
-      raise Faktory.Error.ClientNotConfigured,
-        message: "#{name} not configured"
-    end
+    # if !Configuration.exists?(client) do
+    #   name = Faktory.Utils.module_name(client)
+    #   raise Faktory.Error.ClientNotConfigured,
+    #     message: "#{name} not configured"
+    # end
 
-    jobtype = Utils.module_name(module)
     job = options
       |> Keyword.merge(jid: new_jid(), jobtype: jobtype, args: args)
       |> Utils.stringify_keys
@@ -54,8 +54,8 @@ defmodule Faktory do
     # This is weird, middleware is configured in the client config module,
     # but we allow overriding in faktory_options and thus push options.
     middleware = case options[:middleware] do
-      nil -> client.config.middleware
-      [] -> client.config.middleware
+      nil -> client.config[:middleware]
+      [] -> client.config[:middleware]
       middleware -> middleware
     end
 
@@ -134,7 +134,7 @@ defmodule Faktory do
   """
   @spec with_conn(Keyword.t, (conn -> term)) :: term
   def with_conn(options, func) do
-    client = options[:client] || Configuration.default_client
+    client = options[:client] || get_env(:default_client)
     :poolboy.transaction(client, func)
   end
 

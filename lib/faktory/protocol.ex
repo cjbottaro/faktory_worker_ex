@@ -1,21 +1,18 @@
 defmodule Faktory.Protocol do
   @moduledoc false
 
-  alias Faktory.Connection
-  import Connection, only: [recv: 2]
+  # So we can use our send/2 defined below.
+  import Kernel, except: [send: 2]
 
   def push(conn, job) when is_list(job), do: push(conn, Map.new(job))
 
   def push(conn, job) do
     payload = Poison.encode!(job)
 
-    with :ok <- tx(conn, "PUSH #{payload}"),
-      {:ok, "OK"} <- rx(conn)
+    with :ok <- send(conn, "PUSH #{payload}"),
+      {:ok, "+OK"} <- recv(conn, :line)
     do
       job["jid"]
-    else
-      {:error, :closed} -> push(conn, job) # Retries forever and without delay!
-      {:error, _message} = error -> error
     end
   end
 
@@ -24,25 +21,26 @@ defmodule Faktory.Protocol do
   end
 
   def fetch(conn, queues) when is_binary(queues) do
-    with :ok <- tx(conn, "FETCH #{queues}"),
-      {:ok, job} <- rx(conn)
+    with :ok <- send(conn, "FETCH #{queues}"),
+      {:ok, <<"$", size::binary>>} <- recv(conn, :line),
+      {:size, size} when size != "-1" <- {:size, size},
+      {:ok, json} <- recv(conn, String.to_integer(size)),
+      {:ok, ""} <- recv(conn, :line)
     do
-      job && Poison.decode!(job)
+      Poison.decode!(json)
     else
-      {:error, :closed} -> fetch(conn, queues)  # Retries forever and without delay!
-      {:error, _message} = error -> error
+      {:size, "-1"} -> nil
+      error -> error
     end
   end
 
   def ack(conn, jid) when is_binary(jid) do
     payload = %{"jid" => jid} |> Poison.encode!
-    with :ok <- tx(conn, "ACK #{payload}"),
-      {:ok, "OK"} <- rx(conn)
+
+    with :ok <- send(conn, "ACK #{payload}"),
+      {:ok, "+OK"} <- recv(conn, :line)
     do
       {:ok, jid}
-    else
-      {:error, :closed} -> ack(conn, jid)  # Retries forever and without delay!
-      {:error, _message} = error -> error
     end
   end
 
@@ -53,86 +51,61 @@ defmodule Faktory.Protocol do
       message: message,
       backtrace: backtrace
     } |> Poison.encode!
-    with :ok <- tx(conn, "FAIL #{payload}"),
-      {:ok, "OK"} <- rx(conn)
+
+    with :ok <- send(conn, "FAIL #{payload}"),
+      {:ok, "+OK"} <- recv(conn, :line)
     do
       {:ok, jid}
-    else
-      {:error, :closed} -> fail(conn, jid, errtype, message, backtrace)  # Retries forever and without delay!
-      {:error, _message} = error -> error
     end
   end
 
   def info(conn) do
-    with :ok <- tx(conn, "INFO"),
-      {:ok, info} <- rx(conn)
+    with :ok <- send(conn, "INFO"),
+      {:ok, <<"$", size::binary>>} <- recv(conn, :line),
+      size = String.to_integer(size),
+      {:ok, json} <- recv(conn, size),
+      {:ok, ""} <- recv(conn, :line)
     do
-      info && Poison.decode!(info)
-    else
-      {:error, :closed} -> info(conn)  # Retries forever and without delay!
-      {:error, _message} = error -> error
+      Poison.decode(json)
     end
   end
 
   def beat(conn, wid) do
     payload = %{wid: wid} |> Poison.encode!
-    with :ok <- tx(conn, "BEAT #{payload}"),
-      {:ok, response} <- rx(conn)
+
+    with :ok <- send(conn, "BEAT #{payload}"),
+      {:ok, "+OK"} <- recv(conn, :line)
     do
-      case response do
-        "OK" -> :ok
-        info -> {:ok, Poison.decode!(info)["signal"]}
-      end
+      :ok
     else
-      {:error, :closed} -> beat(conn, wid) # Retries forever and without delay!
-      {:error, _message} = error -> error
+      {:ok, json} -> {:ok, Poison.decode!(json)}
+      error -> error
     end
   end
 
   def flush(conn) do
-    with :ok <- tx(conn, "FLUSH"),
-      {:ok, "OK"} <- rx(conn)
+    with :ok <- send(conn, "FLUSH"),
+      {:ok, "+OK"} <- recv(conn, :line)
     do
       :ok
-    else
-      {:error, :closed} -> flush(conn) # Retries forever and without delay!
-      {:error, _message} = error -> error
     end
   end
 
-  def tx(conn, payload) do
-    Connection.send(conn, "#{payload}\r\n")
+  defp send(conn, data) do
+    Faktory.Connection.send(conn, data)
   end
 
-  def rx(conn) do
-    case recv(conn, :line) do
-      {:ok, <<"+", rest::binary>>} -> {:ok, rest}
-      {:ok, <<"-", error::binary>>} -> {:error, error}
-      {:ok, <<"$", size::binary>>} -> rx(conn, size)
-      {:error, _} = error -> error
+  defp recv(conn, :line) do
+    case Faktory.Connection.recv(conn, :line) do
+      {:ok, <<"-ERR ", reason::binary>>} -> {:error, reason}
+      {:ok, <<"-SHUTDOWN ", reason::binary>>} -> {:error, reason}
+      {:ok, line} -> {:ok, line}
+      error -> error
     end
   end
 
-  defp rx(conn, size) when is_binary(size) do
-    size = String.to_integer(size)
-    rx(conn, size)
-  end
-
-  defp rx(_conn, size) when size == -1, do: {:ok, nil}
-
-  defp rx(conn, size) when size == 0 do
-    case recv(conn, :line) do
-      {:ok, _} -> {:ok, nil}
-      {:error, _} = error -> error
-    end
-  end
-
-  defp rx(conn, size) do
-    retval = recv(conn, size)
-    case recv(conn, :line) do
-      {:ok, _} -> retval
-      {:error, _} = error -> error
-    end
+  defp recv(conn, size) do
+    Faktory.Connection.recv(conn, size)
   end
 
 end
