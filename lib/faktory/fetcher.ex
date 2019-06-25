@@ -30,14 +30,15 @@ defmodule Faktory.Fetcher do
     {:noreply, [job], state}
   end
 
-  defp fetch(conn, queues, error_count \\ 0) do
-    case Faktory.Protocol.fetch(conn, queues) do
-      {:error, reason} ->
+  defp fetch(conn, queues) do
+    Stream.repeatedly(fn -> Faktory.Protocol.fetch(conn, queues) end)
+    |> Enum.reduce_while(0, fn
+      {:ok, %{} = job}, _error_count -> {:halt, job}
+      {:ok, nil},       _error_count -> {:cont, 0}
+      {:error, reason},  error_count ->
         warn_and_sleep(reason, error_count)
-        fetch(conn, queues, error_count + 1)
-      nil -> fetch(conn, queues, 0)
-      job -> job
-    end
+        {:cont, error_count + 1}
+    end)
   end
 
   defp warn_and_sleep(:closed, error_count) do

@@ -27,9 +27,9 @@ defmodule Faktory.Protocol do
       {:ok, json} <- recv(conn, String.to_integer(size)),
       {:ok, ""} <- recv(conn, :line)
     do
-      Poison.decode!(json)
+      {:ok, Poison.decode!(json)}
     else
-      {:size, "-1"} -> nil
+      {:size, "-1"} -> {:ok, nil}
       error -> error
     end
   end
