@@ -1,5 +1,9 @@
 # faktory_worker_ex changes
 
+## 0.7.2
+-----------
+* Fix worker not finding job module when jobtype doesn't match module name.
+
 ## 0.7.1
 -----------
 * Fix `mix faktory` not respecting CLI args.
