@@ -3,7 +3,7 @@
 ## 0.8.0
 -----------
 * Use GenStage instead of BlockingQueue. (PR #36)
-* Use Jason instead of Poison. (https://github.com/cjbottaro/faktory_worker_ex/pull/36)
+* Use Jason instead of Poison. (PR [#36](https://github.com/cjbottaro/faktory_worker_ex/pull/36))
 
 ## 0.7.1
 -----------
