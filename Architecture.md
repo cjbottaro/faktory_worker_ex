@@ -27,7 +27,7 @@ The following diagram shows (almost) all the processes involved in a `Worker`.
 ```
 
 1. The fetcher asks the Faktory server for jobs.
-1. Runners ask the fetcher for jobs to run. They emit a report on the success or failure of a job that has been ran.
+1. Runners ask the fetcher for jobs to run. They emit a report on the success or failure of a job.
 1. The reporter takes these reports and sends an ACK or FAIL message back to the Faktory server.
 
 The number of jobs that can be processed concurrently is equal to the number of runners, which is set by the `concurrency` option.
@@ -47,7 +47,7 @@ Still, scaling out fetchers and reporters is implemented (for fun and learning).
 
 ## Connection
 
-The actually connections to the Faktory server use the [Connection](https://hexdocs.pm/connection/Connection.html) library which aids in error handling and reconnecting.
+Connections to the Faktory server use the [Connection](https://hexdocs.pm/connection/Connection.html) library which aids in error handling and reconnecting.
 
 Network errors cause retries with exponential backoff for fetching, acking, and failing jobs.
 
@@ -62,4 +62,6 @@ At worst, a job will be processed more than once due to a process crashing befor
 
 ## Memory bloat?
 
-Fetchers, runners, and reporters are all long running processes, but each job is executed in its own process. It's the Resque model, but efficient because of BEAM processes vs Unix processes.
+Fetchers, runners, and reporters are all long running processes, but each job is executed in its own process.
+
+It's like the Resque model, but efficient because of BEAM processes vs Unix processes.

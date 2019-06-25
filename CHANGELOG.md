@@ -1,5 +1,9 @@
 # faktory_worker_ex changes
 
+## 0.7.1
+-----------
+* Fix `mix faktory` not respecting CLI args.
+
 ## 0.7.0
 -----------
 * The great simplication refactor; everything done in this version is to reduce conceptual complexity and make the code easier to read and understand.

@@ -22,7 +22,7 @@ defmodule Faktory.Supervisor do
       }
     end
 
-    job_workers = Enum.map 1..config.concurrency, fn index ->
+    runners = Enum.map 1..config.concurrency, fn index ->
       %{
         id: {config.module, Faktory.Runner, index},
         start: {Faktory.Runner, :start_link, [config, index]}
@@ -37,7 +37,7 @@ defmodule Faktory.Supervisor do
       }
     end
 
-    children = [heartbeat | fetchers ++ job_workers ++ reporters]
+    children = [heartbeat | fetchers ++ runners ++ reporters]
     Supervisor.init(children, strategy: :one_for_one)
   end
 

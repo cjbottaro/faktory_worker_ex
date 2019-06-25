@@ -12,6 +12,7 @@ defmodule Faktory.Configuration do
       |> put_wid(module.type) # Client connection don't have wid.
       |> resolve_all_env_vars
       |> Keyword.put_new(:module, module)
+      |> Keyword.merge(Faktory.get_env(:cli_options) || [])
       |> normalize
       |> Keyword.put(:configured, true)
       Application.put_env(module.otp_app, module, config)
