@@ -1,5 +1,9 @@
 # faktory_worker_ex changes
 
+## 0.8.0
+-----------
+* Use GenStage instead of BlockingQueue (PR #36)
+
 ## 0.7.1
 -----------
 * Fix `mix faktory` not respecting CLI args.
