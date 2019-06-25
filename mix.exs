@@ -45,7 +45,7 @@ defmodule Faktory.Mixfile do
   defp deps do
     [
       {:connection, "~> 1.0"},
-      {:poison, "~> 3.1"},
+      {:jason, "~> 1.1"},
       {:poolboy, "~> 1.5"},
       {:socket, "~> 0.3"},
       {:gen_stage, "~> 0.14"},
