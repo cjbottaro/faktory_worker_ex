@@ -2,7 +2,7 @@
 
 ## 0.7.2
 -----------
-* Fix worker not finding job module when jobtype doesn't match module name.
+* Find the right job module when jobtype doesn't match module name.
 
 ## 0.7.1
 -----------
