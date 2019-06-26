@@ -27,6 +27,12 @@ defmodule Faktory.Reporter do
   defp ack(conn, jid, errors \\ 0) do
     case Faktory.Protocol.ack(conn, jid) do
       {:ok, jid} -> log_success(:ack, %{jid: jid})
+
+      # Server error.
+      {:error, {error, reason}} ->
+        Logger.warn("Server error - ACK: #{error} #{reason}")
+
+      # Network error.
       {:error, reason} ->
         log_and_sleep(:ack, reason, errors)
         ack(conn, jid, errors + 1) # Retry
@@ -40,6 +46,12 @@ defmodule Faktory.Reporter do
 
     case Faktory.Protocol.fail(conn, jid, errtype, message, trace) do
       {:ok, jid} -> log_success(:fail, %{jid: jid, error: info})
+
+      # Server error.
+      {:error, {error, reason}} ->
+        Logger.warn("Server error - FAIL: #{error} #{reason}")
+
+      # Network error.
       {:error, reason} ->
         log_and_sleep(:fail, reason, errors)
         fail(conn, jid, info, errors + 1) # Retry
