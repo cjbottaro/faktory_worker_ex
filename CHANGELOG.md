@@ -3,6 +3,7 @@
 ## 0.7.2
 -----------
 * Find the right job module when jobtype doesn't match module name.
+* Handle FAIL and ACK server errors.
 
 ## 0.7.1
 -----------
