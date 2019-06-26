@@ -29,13 +29,9 @@ defmodule Faktory.JobTask do
     Faktory.Logger.debug "performing job #{inspect(job)}"
 
     Faktory.Middleware.traverse(job, middleware, fn job ->
-      try do
-        Module.safe_concat(Elixir, job["jobtype"])
-      rescue
-        ArgumentError -> raise Faktory.Error.InvalidJobType, message: job["jobtype"]
-      else
-        module -> apply(module, :perform, job["args"])
-      end
+      module = state.config.jobtype_map[ job["jobtype"] ]
+      module || raise(Faktory.Error.InvalidJobType, message: job["jobtype"])
+      apply(module, :perform, job["args"])
     end)
   end
 

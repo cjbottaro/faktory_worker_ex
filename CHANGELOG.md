@@ -1,5 +1,10 @@
 # faktory_worker_ex changes
 
+## 0.7.2
+-----------
+* Find the right job module when jobtype doesn't match module name.
+* Handle FAIL and ACK server errors.
+
 ## 0.7.1
 -----------
 * Fix `mix faktory` not respecting CLI args.

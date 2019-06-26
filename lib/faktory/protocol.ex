@@ -41,6 +41,8 @@ defmodule Faktory.Protocol do
       {:ok, "+OK"} <- recv(conn, :line)
     do
       {:ok, jid}
+    else
+      error -> error
     end
   end
 
@@ -56,6 +58,8 @@ defmodule Faktory.Protocol do
       {:ok, "+OK"} <- recv(conn, :line)
     do
       {:ok, jid}
+    else
+      error -> error
     end
   end
 
@@ -97,8 +101,7 @@ defmodule Faktory.Protocol do
 
   defp recv(conn, :line) do
     case Faktory.Connection.recv(conn, :line) do
-      {:ok, <<"-ERR ", reason::binary>>} -> {:error, reason}
-      {:ok, <<"-SHUTDOWN ", reason::binary>>} -> {:error, reason}
+      {:ok, <<"-", error::binary>>} -> parse_error(error)
       {:ok, line} -> {:ok, line}
       error -> error
     end
@@ -106,6 +109,13 @@ defmodule Faktory.Protocol do
 
   defp recv(conn, size) do
     Faktory.Connection.recv(conn, size)
+  end
+
+  defp parse_error(error) do
+    case error |> String.trim() |> String.split(" ", parts: 2) do
+      [error] -> {:error, {error, ""}}
+      [error, reason] -> {:error, {error, reason}}
+    end
   end
 
 end
