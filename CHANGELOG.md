@@ -3,7 +3,7 @@
 ## 0.8.0
 -----------
 * Use GenStage instead of BlockingQueue. (PR [#36](https://github.com/cjbottaro/faktory_worker_ex/pull/36))
-* Find the right job module when jobtype doesn't match module name. (PR [#36](https://github.com/cjbottaro/faktory_worker_ex/pull/35))
+* Find the right job module when jobtype doesn't match module name. (PR [#35](https://github.com/cjbottaro/faktory_worker_ex/pull/35))
 * Use Jason instead of Poison.
 
 
