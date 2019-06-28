@@ -8,7 +8,7 @@ defmodule Faktory.Registry do
     }
   end
 
-  def name(worker_module, name) do
-    {:via, Registry, {__MODULE__, {worker_module, name}}}
+  def name(id) do
+    {:via, Registry, {__MODULE__, id}}
   end
 end

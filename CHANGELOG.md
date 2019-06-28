@@ -1,9 +1,10 @@
 # faktory_worker_ex changes
 
-## 0.7.2
+## 0.8.0
 -----------
+* Use GenStage instead of BlockingQueue. (PR [#36](https://github.com/cjbottaro/faktory_worker_ex/pull/36))
+* Use Jason instead of Poison.
 * Find the right job module when jobtype doesn't match module name.
-* Handle FAIL and ACK server errors.
 
 ## 0.7.1
 -----------

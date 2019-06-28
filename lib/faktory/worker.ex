@@ -58,7 +58,9 @@ defmodule Faktory.Worker do
     concurrency: 20,
     queues: ["default"],
     password: nil,
-    use_tls: false
+    use_tls: false,
+    fetcher_count: 1,
+    reporter_count: 1
   ]
 
   @doc """
@@ -73,7 +75,9 @@ defmodule Faktory.Worker do
     concurrency: 20,
     queues: ["default"],
     password: nil,
-    use_tls: false
+    use_tls: false,
+    fetcher_count: 1,
+    reporter_count: 1
   ]
   ```
   """
@@ -128,7 +132,9 @@ defmodule Faktory.Worker do
     concurrency: 20,
     queues: ["default"],
     password: nil,
-    use_tls: false
+    use_tls: false,
+    fetcher_count: 1,
+    reporter_count: 1
   ]
   ```
 

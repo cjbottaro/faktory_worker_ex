@@ -104,7 +104,7 @@ defmodule Faktory.Connection do
   defp handshake(state) do
     with \
       {:ok, <<"+HI", rest::binary>>} <- socket_recv(state, :line),
-      {:ok, server_config} <- Poison.decode(rest),
+      {:ok, server_config} <- Jason.decode(rest),
       server_version = server_config["v"],
       password_opts = password_opts(state.password, server_config),
       payload = hello_payload(state, password_opts),
@@ -128,7 +128,7 @@ defmodule Faktory.Connection do
     }
     |> add_wid(state) # Client connection don't have wid
     |> Map.merge(password_opts)
-    |> Poison.encode!
+    |> Jason.encode!
   end
 
   defp add_wid(payload, %{wid: wid}), do: Map.put(payload, :wid, wid)
