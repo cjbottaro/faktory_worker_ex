@@ -3,6 +3,7 @@ defmodule Faktory.Connection do
   use Connection
   alias Faktory.Logger
   import Faktory.Utils, only: [if_test: 1]
+  import Kernel, except: [send: 2]
 
   @default_timeout 4000
 
@@ -10,12 +11,20 @@ defmodule Faktory.Connection do
     Connection.start_link(__MODULE__, config)
   end
 
-  def send(conn, data) do
+  def send(conn, data) when is_pid(conn) do
     Connection.call(conn, {:send, data})
   end
 
-  def recv(conn, size) do
+  def send(state, data) when is_map(state) do
+    socket_send(state, data)
+  end
+
+  def recv(conn, size) when is_pid(conn) do
     Connection.call(conn, {:recv, size})
+  end
+
+  def recv(state, size, options \\ []) when is_map(state) do
+    socket_recv(state, size, options)
   end
 
   def close(conn) do
@@ -41,8 +50,11 @@ defmodule Faktory.Connection do
     with \
       {:ok, socket} <- socket_connect(state),
       state = %{state | socket: socket},
-      :ok <- handshake(state)
+      {:ok, server} <- Faktory.Protocol.handshake(state, hello(state))
     do
+      if server["v"] > 2 do
+        Logger.warn("Server protocol version higher than supported")
+      end
       log_connect(context, state)
       if_test do: state[:on_connect] && state[:on_connect].()
       {:ok, state}
@@ -87,60 +99,34 @@ defmodule Faktory.Connection do
   end
 
   def handle_call({:send, data}, _from, state) do
-    case socket_send(state, data) do
+    case send(state, data) do
       :ok -> {:reply, :ok, state}
       {:error, _} = error -> {:disconnect, error, error, state}
     end
   end
 
   def handle_call({:recv, size}, _, state) do
-    case socket_recv(state, size, timeout: @default_timeout) do
+    case recv(state, size, timeout: @default_timeout) do
       {:ok, _data} = result -> {:reply, result, state}
       {:error, :timeout} = timeout -> {:reply, timeout, state}
       {:error, _reason} = error -> {:disconnect, error, error, state}
     end
   end
 
-  defp handshake(state) do
-    with \
-      {:ok, <<"+HI", rest::binary>>} <- socket_recv(state, :line),
-      {:ok, server_config} <- Jason.decode(rest),
-      server_version = server_config["v"],
-      password_opts = password_opts(state.password, server_config),
-      payload = hello_payload(state, password_opts),
-      :ok <- socket_send(state, "HELLO #{payload}"),
-      {:ok, "+OK"} <- socket_recv(state, :line)
-    do
-      if server_version > 2 do
-        Logger.warn("Warning: Faktory server protocol #{server_version} in use, but this worker doesn't speak that version")
-      end
-      :ok
-    end
-  end
-
-  defp hello_payload(state, password_opts) do
+  defp hello(state) do
     alias Faktory.Utils
     %{
+      password: state.password,
       hostname: Utils.hostname,
       pid: Utils.unix_pid,
       labels: ["elixir"],
       v: 2,
     }
     |> add_wid(state) # Client connection don't have wid
-    |> Map.merge(password_opts)
-    |> Jason.encode!
   end
 
   defp add_wid(payload, %{wid: wid}), do: Map.put(payload, :wid, wid)
   defp add_wid(payload, _), do: payload
-
-  defp password_opts(nil, %{"s" => _salt}), do: raise "This server requires a password, but a password hasn't been configured"
-
-  defp password_opts(password, %{"s" => salt, "i" => iterations}) do
-    %{pwdhash: Faktory.Utils.hash_password(iterations, password, salt)}
-  end
-
-  defp password_opts(_password, _server_config), do: %{}
 
   defp socket_connect(state) do
     %{socket_impl: socket_impl, host: host, port: port, use_tls: use_tls} = state

@@ -26,6 +26,7 @@ defmodule Faktory.Fetcher do
     queues = state.config.queues
 
     job = fetch(conn, queues)
+    Faktory.Logger.info(DateTime.utc_now |> DateTime.to_iso8601)
     Faktory.Logger.debug "#{inspect self()} fetched job: #{inspect job}"
     {:noreply, [job], state}
   end
@@ -33,11 +34,21 @@ defmodule Faktory.Fetcher do
   defp fetch(conn, queues) do
     Stream.repeatedly(fn -> Faktory.Protocol.fetch(conn, queues) end)
     |> Enum.reduce_while(0, fn
-      {:ok, %{} = job}, _error_count -> {:halt, job}
-      {:ok, nil},       _error_count -> {:cont, 0}
-      {:error, reason},  error_count ->
-        warn_and_sleep(reason, error_count)
-        {:cont, error_count + 1}
+      # Yay, job found!
+      {:ok, %{} = job},        _count -> {:halt, job}
+
+      # No job available.
+      {:ok, nil},              _count -> IO.puts("nothing found"); {:cont, 0}
+
+      # Server error, report, and try again, I guess.
+      {:ok, {:error, reason}}, _count ->
+        Faktory.Logger.warn("Server error during fetch: #{reason}")
+        {:cont, 0}
+
+      # Network error, log, sleep, and try again.
+      {:error, reason},         count ->
+        warn_and_sleep(reason, count)
+        {:cont, count + 1}
     end)
   end
 

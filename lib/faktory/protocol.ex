@@ -1,18 +1,55 @@
+# Speak RESP with the Faktory server.
+# Return value should be one of three things:
+#   {:ok, result}           # All good.
+#   {:error, reason}        # Network error, ok to retry.
+#   {:ok, {:error, reason}} # Server error (aka RESP error), probably can't retry.
 defmodule Faktory.Protocol do
   @moduledoc false
 
-  # So we can use our send/2 defined below.
-  import Kernel, except: [send: 2]
+  @type success       :: {:ok, binary}
+  @type network_error :: {:error, reason :: binary}
+  @type server_error  :: {:ok, {:error, reason :: binary}}
+
+  @type conn :: Faktory.Connection.t
+  @type job :: Map.t | Keyword.t
+
+  @type jid :: binary
+
+  alias Faktory.{Connection, Resp}
+
+  def handshake(conn, hello) do
+    with \
+      {:ok, <<"HI", json::binary>>} <- Resp.recv(conn),
+      {:ok, server} <- Jason.decode(json),
+      {:ok, hello} <- build_hello(hello, server),
+      :ok <- Connection.send(conn, "HELLO #{hello}"),
+      {:ok, "OK"} <- Resp.recv(conn)
+    do
+      {:ok, server}
+    end
+  end
+
+  defp build_hello(hello, server) do
+    case server do
+      %{"s" => salt, "i" => iterations} ->
+        pwdhash = (hello.password || "") |> Utils.hash_password(salt, iterations)
+        Map.put(hello, :pwdhash, pwdhash)
+
+      _ -> hello
+    end
+    |> Map.delete(:password)
+    |> Jason.encode(hello)
+  end
+
+  @spec push(conn, job) :: success | network_error | server_error
 
   def push(conn, job) when is_list(job), do: push(conn, Map.new(job))
 
   def push(conn, job) do
     payload = Jason.encode!(job)
 
-    with :ok <- send(conn, "PUSH #{payload}"),
-      {:ok, "+OK"} <- recv(conn, :line)
-    do
-      job["jid"]
+    with :ok <- Connection.send(conn, "PUSH #{payload}") do
+      Resp.recv(conn)
     end
   end
 
@@ -21,26 +58,19 @@ defmodule Faktory.Protocol do
   end
 
   def fetch(conn, queues) when is_binary(queues) do
-    with :ok <- send(conn, "FETCH #{queues}"),
-      {:ok, <<"$", size::binary>>} <- recv(conn, :line),
-      {:size, size} when size != "-1" <- {:size, size},
-      {:ok, json} <- recv(conn, String.to_integer(size)),
-      {:ok, ""} <- recv(conn, :line)
+    with \
+      :ok <- Connection.send(conn, "FETCH #{queues}"),
+      {:ok, <<json::binary>>} <- Resp.recv(conn)
     do
       {:ok, Jason.decode!(json)}
-    else
-      {:size, "-1"} -> {:ok, nil}
-      error -> error
     end
   end
 
   def ack(conn, jid) when is_binary(jid) do
     payload = %{"jid" => jid} |> Jason.encode!
 
-    with :ok <- send(conn, "ACK #{payload}"),
-      {:ok, "+OK"} <- recv(conn, :line)
-    do
-      {:ok, jid}
+    with :ok <- Connection.send(conn, "ACK #{payload}") do
+      Resp.recv(conn)
     end
   end
 
@@ -52,60 +82,32 @@ defmodule Faktory.Protocol do
       backtrace: backtrace
     } |> Jason.encode!
 
-    with :ok <- send(conn, "FAIL #{payload}"),
-      {:ok, "+OK"} <- recv(conn, :line)
-    do
-      {:ok, jid}
+    with :ok <- Connection.send(conn, "FAIL #{payload}") do
+      Resp.recv(conn)
     end
   end
 
   def info(conn) do
-    with :ok <- send(conn, "INFO"),
-      {:ok, <<"$", size::binary>>} <- recv(conn, :line),
-      size = String.to_integer(size),
-      {:ok, json} <- recv(conn, size),
-      {:ok, ""} <- recv(conn, :line)
+    with \
+      :ok <- Connection.send(conn, "INFO"),
+      {:ok, <<json::binary>>} <- Resp.recv(conn)
     do
-      Jason.decode(json)
+      {:ok, Jason.decode!(json)}
     end
   end
 
   def beat(conn, wid) do
     payload = %{wid: wid} |> Jason.encode!
 
-    with :ok <- send(conn, "BEAT #{payload}"),
-      {:ok, "+OK"} <- recv(conn, :line)
-    do
-      :ok
-    else
-      {:ok, json} -> {:ok, Jason.decode!(json)}
-      error -> error
+    with :ok <- Connection.send(conn, "BEAT #{payload}") do
+      Resp.recv(conn)
     end
   end
 
   def flush(conn) do
-    with :ok <- send(conn, "FLUSH"),
-      {:ok, "+OK"} <- recv(conn, :line)
-    do
-      :ok
+    with :ok <- Connection.send(conn, "FLUSH") do
+      Resp.recv(conn)
     end
-  end
-
-  defp send(conn, data) do
-    Faktory.Connection.send(conn, data)
-  end
-
-  defp recv(conn, :line) do
-    case Faktory.Connection.recv(conn, :line) do
-      {:ok, <<"-ERR ", reason::binary>>} -> {:error, reason}
-      {:ok, <<"-SHUTDOWN ", reason::binary>>} -> {:error, reason}
-      {:ok, line} -> {:ok, line}
-      error -> error
-    end
-  end
-
-  defp recv(conn, size) do
-    Faktory.Connection.recv(conn, size)
   end
 
 end
