@@ -22,6 +22,7 @@ defmodule Faktory.Runner do
     args = job["args"]
     jobtype = job["jobtype"]
     middleware = config.middleware
+    jobtype_map = config.jobtype_map
 
     Faktory.Logger.info "START 🚀 #{inspect self()} jid-#{jid} (#{jobtype}) #{inspect args}"
 
@@ -36,13 +37,9 @@ defmodule Faktory.Runner do
 
     {pid, ref} = spawn_monitor fn ->
       Faktory.Middleware.traverse(job, middleware, fn job ->
-        try do
-          Module.safe_concat(Elixir, job["jobtype"])
-        rescue
-          ArgumentError -> raise Faktory.Error.InvalidJobType, message: job["jobtype"]
-        else
-          module -> apply(module, :perform, job["args"])
-        end
+        module = jobtype_map[ job["jobtype"] ]
+        module || raise(Faktory.Error.InvalidJobType, message: job["jobtype"])
+        apply(module, :perform, job["args"])
       end)
     end
 
