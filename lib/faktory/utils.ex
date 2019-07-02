@@ -49,6 +49,10 @@ defmodule Faktory.Utils do
     :os.system_time(:milli_seconds)
   end
 
+  def elapsed(start_time) do
+    (System.monotonic_time(:millisecond) - start_time) / 1000
+  end
+
   def env do
     cond do
       function_exported?(Mix, :env, 1) -> Mix.env
@@ -58,7 +62,7 @@ defmodule Faktory.Utils do
     end
   end
 
-  def hash_password(iterations, password, salt) do
+  def hash_password(password, salt, iterations) do
     1..iterations
     |> Enum.reduce(password <> salt, fn(_i, acc) ->
       :crypto.hash(:sha256, acc)

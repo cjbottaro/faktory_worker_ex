@@ -39,52 +39,69 @@ defmodule Faktory.Reporter do
     end
   end
 
-  defp ack(conn, report, error_count \\ 0) do
+  defp ack(conn, report) do
     jid = report.job["jid"]
 
-    case Faktory.Protocol.ack(conn, jid) do
-      {:ok, _jid} ->
-        if_test do: send TestJidPidMap.get(jid), %{jid: jid, error: nil}
+    Stream.repeatedly(fn -> Faktory.Protocol.ack(conn, jid) end)
+    |> Enum.reduce_while(0, fn
+      # Everything went smoothly.
+      {:ok, "OK"}, _count ->
         log("SUCCESS 🥂", report)
-      {:error, reason} ->
-        warn_and_sleep(:ack, reason, error_count)
-        ack(conn, report, error_count + 1) # Retry
-    end
+        {:halt, :ok}
+
+      # Server error. Log and move on.
+      {:ok, {:error, reason}}, _count ->
+        Logger.warn("Server error on ack: #{reason}")
+        {:halt, :ok}
+
+      # Network error. Log, sleep, and retry.
+      {:error, reason}, count ->
+        warn_and_sleep("ack", reason, count)
+        {:cont, count+1}
+    end)
   end
 
-  defp fail(conn, report, error_count \\ 0) do
+  defp fail(conn, report) do
     jid = report.job["jid"]
     errtype = report.error.errtype
     message = report.error.message
     trace   = report.error.trace
 
-    case Faktory.Protocol.fail(conn, jid, errtype, message, trace) do
-      {:ok, _jid} ->
-        if_test do: send TestJidPidMap.get(jid), %{jid: jid, error: report.error}
+    Stream.repeatedly(fn -> Faktory.Protocol.fail(conn, jid, errtype, message, trace) end)
+    |> Enum.reduce_while(0, fn
+      # Everything went smoothly.
+      {:ok, "OK"}, _count ->
         log("FAILURE 💥", report)
-      {:error, reason} ->
-        warn_and_sleep(:fail, reason, error_count)
-        fail(conn, report, error_count + 1) # Retry
-    end
+        {:halt, :ok}
+
+      # Server error. Log and move on.
+      {:ok, {:error, reason}}, _count ->
+        Logger.warn("Server error on ack: #{reason}")
+        {:halt, :ok}
+
+      # Network error. Log, sleep, and retry.
+      {:error, reason}, count ->
+        warn_and_sleep("fail", reason, count)
+        {:cont, count+1}
+    end)
+  end
+
+  defp warn_and_sleep(command, reason, count) do
+    time = Utils.exp_backoff(count)
+    Logger.warn("Network error on #{command}: #{reason} -- retrying in #{time/1000}s")
+    Process.sleep(time)
   end
 
   defp log(status, report) do
     jid = report.job["jid"]
     jobtype = report.job["jobtype"]
     worker_pid = report.worker_pid
-    time = elapsed(report.start_time)
-    Faktory.Logger.info "#{status} #{inspect worker_pid} jid-#{jid} (#{jobtype}) #{time}s"
-  end
+    time = Utils.elapsed(report.start_time)
+    Logger.info "#{status} #{inspect worker_pid} jid-#{jid} (#{jobtype}) #{time}s"
 
-  defp warn_and_sleep(op, reason, errors) do
-    reason = Utils.stringify(reason)
-    sleep_time = Utils.exp_backoff(errors)
-    Logger.warn("#{op} failure: #{reason} -- retrying in #{sleep_time/1000}s")
-    Process.sleep(sleep_time)
-  end
-
-  defp elapsed(start_time) do
-    (System.monotonic_time(:millisecond) - start_time) / 1000
+    if_test do
+      send TestJidPidMap.get(jid), %{jid: jid, error: report.error}
+    end
   end
 
 end

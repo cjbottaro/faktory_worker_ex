@@ -15,7 +15,7 @@ defmodule Faktory.Protocol do
 
   @type jid :: binary
 
-  alias Faktory.{Connection, Resp}
+  alias Faktory.{Utils, Connection, Resp}
 
   def handshake(conn, hello) do
     with \
