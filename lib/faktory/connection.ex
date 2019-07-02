@@ -144,7 +144,7 @@ defmodule Faktory.Connection do
     state.socket_impl.send(state.socket, chomp(data) <> "\r\n")
   end
 
-  defp socket_recv(state, size, options \\ [])
+  defp socket_recv(state, size, options)
 
   defp socket_recv(state, :line, options) do
     case state.socket_impl.recv(state.socket, :line, options) do
