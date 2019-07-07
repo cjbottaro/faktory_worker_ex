@@ -6,6 +6,7 @@
 * Find the right job module when jobtype doesn't match module name. (PR [#35](https://github.com/cjbottaro/faktory_worker_ex/pull/35))
 * Implement Redis Serialization Protocol (RESP). (PR [#40](https://github.com/cjbottaro/faktory_worker_ex/pull/40))
 * Graceful shutdown on SIGTERM. (PR [#41](https://github.com/cjbottaro/faktory_worker_ex/pull/41))
+* Handle quiet and terminate from Faktory server. (PR [#42](https://github.com/cjbottaro/faktory_worker_ex/pull/42))
 * Use Jason instead of Poison.
 
 
