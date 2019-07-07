@@ -9,7 +9,8 @@ defmodule Faktory.Runner do
   end
 
   def init({config, index}) do
-    :ok = Faktory.SignalHandler.register_worker |> IO.inspect
+    Faktory.Logger.debug "Worker stage #{inspect self()} starting up"
+    Process.flag(:trap_exit, true) # For shutdown grace period, see supervisor.
     {:producer_consumer, config, subscribe_to: subscribe_to(config, index)}
   end
 
@@ -55,9 +56,8 @@ defmodule Faktory.Runner do
     {:noreply, [report], config}
   end
 
-  def handle_cast(:shutdown, state) do
-    Faktory.SignalHandler.deregister_worker
-    {:stop, :normal, state}
+  def terminate(_reason, _state) do
+    Faktory.Logger.debug "Worker stage #{inspect self()} shutting down"
   end
 
   # I'm not sure why, but each job worker cannot subscribe to all the fetchers. I think it
