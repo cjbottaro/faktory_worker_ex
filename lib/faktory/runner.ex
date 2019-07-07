@@ -9,6 +9,7 @@ defmodule Faktory.Runner do
   end
 
   def init({config, index}) do
+    Faktory.SignalHandler.register_worker
     {:producer_consumer, config, subscribe_to: subscribe_to(config, index)}
   end
 
@@ -52,6 +53,11 @@ defmodule Faktory.Runner do
     end
 
     {:noreply, [report], config}
+  end
+
+  def handle_cast(:shutdown, state) do
+    Faktory.SignalHandler.deregister_worker
+    {:stop, :normal, state}
   end
 
   # I'm not sure why, but each job worker cannot subscribe to all the fetchers. I think it
