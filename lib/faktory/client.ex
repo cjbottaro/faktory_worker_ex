@@ -2,7 +2,7 @@ defmodule Faktory.Client do
   @moduledoc """
   Create and configure a client for _enqueing_ jobs.
 
-  It works exatly the same as configuring an Ecto Repo.
+  It works exactly the same as configuring an Ecto Repo.
 
   ```elixir
   defmodule MyFaktoryClient do

@@ -58,10 +58,6 @@ You should see logging output and the above job being processed.
 
 To see command line options that can override in-app configuration.
 
-`iex -S mix faktory`
-
-If you want to debug your jobs using `IEx.pry`.
-
 ## Configuration
 
 Compile-time config is done with `Mix.Config`.
@@ -95,8 +91,7 @@ You should be able to go to [http://localhost:7420](http://localhost:7420) and s
 
 ## Missing features
 
-* Responding to `quiet` and `terminate`
-* Running without `mix` (e.g. a Distillery release)
+* Release support
 
 ## Issues / Questions
 
