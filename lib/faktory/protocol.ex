@@ -99,8 +99,13 @@ defmodule Faktory.Protocol do
   def beat(conn, wid) do
     payload = %{wid: wid} |> Jason.encode!
 
-    with :ok <- Connection.send(conn, "BEAT #{payload}") do
-      Resp.recv(conn)
+    with :ok <- Connection.send(conn, "BEAT #{payload}"),
+      {:ok, <<data::binary>>} <- Resp.recv(conn)
+    do
+      case data do
+        "OK" -> {:ok, "OK"}
+        json -> {:ok, Jason.decode!(json)}
+      end
     end
   end
 

@@ -1,27 +1,77 @@
 defmodule Faktory.Heartbeat do
   @moduledoc false
 
+  use GenServer
+
   alias Faktory.{Logger, Protocol}
-  import Faktory.Utils, only: [stringify: 1]
+
+  @interval 15_000
+
+  def child_spec(config) do
+    %{
+      id: {config.module, __MODULE__},
+      start: {__MODULE__, :start_link, [config]}
+    }
+  end
+
+  def name(config) do
+    Faktory.Registry.name({config.module, __MODULE__})
+  end
 
   def start_link(config) do
-    Task.start_link(__MODULE__, :run, [config])
+    GenServer.start_link(__MODULE__, config, name: name(config))
   end
 
-  def run(config) do
+  def init(config) do
+    Process.send_after(self(), :beat, @interval)
     {:ok, conn} = Faktory.Connection.start_link(config)
-    Stream.interval(15_000)
-    |> Enum.each(fn _ -> beat(config, conn) end)
+    {:ok, %{config: config, conn: conn, quiet: false, stop: false}}
   end
 
-  def beat(config, conn) do
-    wid = config.wid
+  def handle_info(:beat, state) do
+    wid = state.config.wid
+    conn = state.conn
 
     case Protocol.beat(conn, wid) do
-      :ok -> Logger.debug("wid-#{wid} Heartbeat ok")
-      {:ok, signal} -> Logger.debug("wid-#{wid} Heartbeat #{signal}")
-      {:error, reason} -> Logger.warn("wid-#{wid} Heartbeat ERROR: #{stringify(reason)}")
+      {:ok, signal} when is_map(signal) ->
+        Logger.debug("wid-#{wid} Heartbeat #{inspect signal}")
+        Process.send_after(self(), :beat, @interval)
+        case signal do
+          %{"state" => "quiet"} -> send(self(), :quiet)
+          %{"state" => "terminate"} -> send(self(), :stop)
+        end
+
+      {:ok, %{"state" => "stop"} = signal} ->
+        Logger.debug("wid-#{wid} Heartbeat #{inspect signal}")
+        send(self(), :stop)
+        Process.send_after(self(), :beat, @interval)
+
+      {:ok, signal} ->
+        Logger.debug("wid-#{wid} Heartbeat #{signal}")
+        Process.send_after(self(), :beat, @interval)
+
+      {:error, reason} ->
+        Logger.warn("Network error in heartbeat for wid-#{wid}: #{reason} -- retrying in 1s")
+        Process.send_after(self(), :beat, 1000)
     end
+
+    {:noreply, state}
+  end
+
+  def handle_info(:quiet, %{quiet: true} = state), do: {:noreply, state}
+  def handle_info(:quiet, state) do
+    config = state.config
+    Enum.each 1..config.fetcher_count, fn index ->
+      name = Faktory.Fetcher.name(config, index)
+      GenStage.call(name, :quiet)
+    end
+    {:noreply, %{state | quiet: true}}
+  end
+
+  def handle_info(:stop, %{stop: true} = state), do: {:noreply, state}
+  def handle_info(:stop, state) do
+    :init.stop()
+    {:noreply, %{state | stop: true}}
   end
 
 end
