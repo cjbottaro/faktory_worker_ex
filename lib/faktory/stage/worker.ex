@@ -16,13 +16,13 @@ defmodule Faktory.Stage.Worker do
   end
 
   def start_link(config, index) do
-    GenStage.start_link(__MODULE__, {config, index}, name: name(config, index))
+    GenStage.start_link(__MODULE__, config, name: name(config, index))
   end
 
-  def init({config, index}) do
+  def init(config) do
     Faktory.Logger.debug "Worker stage #{inspect self()} starting up"
     Process.flag(:trap_exit, true) # For shutdown grace period, see supervisor.
-    {:producer_consumer, config, subscribe_to: subscribe_to(config, index)}
+    {:producer_consumer, config, subscribe_to: subscribe_to(config)}
   end
 
   # I originally tried returning [] here and emitting the events asynchronously in
@@ -77,12 +77,12 @@ defmodule Faktory.Stage.Worker do
   # at a time, and only by job workers 1-2. You have to enqueue 8 jobs in order to
   # get job workers 3-4 to "wake up".
   #
-  # Simple solution is to say job workers 1-2 subscribe to fetcher 1, while job workers 3-4
-  # subscribe to fetcher 2.
-  defp subscribe_to(config, index) do
-    fetcher_index = rem(index, config.fetcher_count) + 1
-    fetcher_name = Faktory.Stage.Fetcher.name(config, fetcher_index)
-    [{fetcher_name, max_demand: 1, min_demand: 0}]
+  # Try this by enqueuing 4 jobs that Process.sleep(1000) then starting up a worker for them.
+  #
+  # I'm not sure why, but if we put a queue stage between the workers and fetchers, then
+  # everything works fine.
+  defp subscribe_to(config) do
+    [{Faktory.Stage.Queue.name(config), max_demand: 1, min_demand: 0}]
   end
 
 end

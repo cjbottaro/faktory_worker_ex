@@ -60,11 +60,8 @@ defmodule Faktory.Heartbeat do
 
   def handle_info(:quiet, %{quiet: true} = state), do: {:noreply, state}
   def handle_info(:quiet, state) do
-    config = state.config
-    Enum.each 1..config.fetcher_count, fn index ->
-      name = Faktory.Stage.Fetcher.name(config, index)
-      GenStage.call(name, :quiet)
-    end
+    Faktory.Stage.Fetcher.names(state.config)
+    |> Enum.each(&GenStage.call(&1, :quiet))
     {:noreply, %{state | quiet: true}}
   end
 

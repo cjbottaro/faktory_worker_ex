@@ -11,11 +11,16 @@ defmodule Faktory.Supervisor do
   def init(config) do
     heartbeat = {Faktory.Heartbeat, config}
 
-    fetchers = Enum.map 1..config.fetcher_count, fn index ->
-      {Faktory.Stage.Fetcher, {config, index}}
-    end
+    fetchers = config
+    |> Faktory.Stage.Fetcher.queues
+    |> Enum.map(fn queue ->
+      config = %{config | queues: [queue]}
+      {Faktory.Stage.Fetcher, {config, queue}}
+    end)
 
-    runners = Enum.map 1..config.concurrency, fn index ->
+    queue = {Faktory.Stage.Queue, config}
+
+    workers = Enum.map 1..config.concurrency, fn index ->
       {Faktory.Stage.Worker, {config, index}}
     end
 
@@ -23,7 +28,7 @@ defmodule Faktory.Supervisor do
       {Faktory.Stage.Reporter, {config, index}}
     end
 
-    children = [heartbeat | fetchers ++ runners ++ reporters]
+    children = [heartbeat | fetchers ++ [queue] ++ workers ++ reporters]
     Supervisor.init(children, strategy: :one_for_one)
   end
 
