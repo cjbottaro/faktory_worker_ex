@@ -9,7 +9,7 @@ defmodule Faktory.Runner do
   end
 
   def init({config, index}) do
-    Faktory.SignalHandler.register_worker
+    :ok = Faktory.SignalHandler.register_worker
     {:producer_consumer, config, subscribe_to: subscribe_to(config, index)}
   end
 
