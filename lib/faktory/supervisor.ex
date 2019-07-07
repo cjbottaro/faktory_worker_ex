@@ -9,33 +9,18 @@ defmodule Faktory.Supervisor do
   end
 
   def init(config) do
-    heartbeat = %{
-      id: {config.module, :heartbeat},
-      start: {Faktory.Heartbeat, :start_link, [config]}
-    }
+    heartbeat = {Faktory.Heartbeat, config}
 
-    # TODO make the count configurable
     fetchers = Enum.map 1..config.fetcher_count, fn index ->
-      %{
-        id: {config.module, Faktory.Fetcher, index},
-        start: {Faktory.Fetcher, :start_link, [config, index]}
-      }
+      {Faktory.Stage.Fetcher, {config, index}}
     end
 
     runners = Enum.map 1..config.concurrency, fn index ->
-      %{
-        id: {config.module, Faktory.Runner, index},
-        start: {Faktory.Runner, :start_link, [config, index]},
-        shutdown: config.shutdown_grace_period
-      }
+      {Faktory.Stage.Worker, {config, index}}
     end
 
-    # TODO make the count configurable
     reporters = Enum.map 1..config.reporter_count, fn index ->
-      %{
-        id: {config.module, Faktory.Reporter, index},
-        start: {Faktory.Reporter, :start_link, [config, index]}
-      }
+      {Faktory.Stage.Reporter, {config, index}}
     end
 
     children = [heartbeat | fetchers ++ runners ++ reporters]

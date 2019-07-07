@@ -1,4 +1,4 @@
-defmodule Faktory.Fetcher do
+defmodule Faktory.Stage.Fetcher do
   @moduledoc false
 
   defstruct [:config, :conn, :error_count, :quiet]
@@ -21,6 +21,7 @@ defmodule Faktory.Fetcher do
   end
 
   def init(config) do
+    Faktory.Logger.debug "Fetcher stage #{inspect self()} starting up"
     {:ok, conn} = Faktory.Connection.start_link(config)
 
     state = %__MODULE__{

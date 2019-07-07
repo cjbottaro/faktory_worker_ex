@@ -1,11 +1,22 @@
-defmodule Faktory.Runner do
+defmodule Faktory.Stage.Worker do
   @moduledoc false
 
   use GenStage
 
+  def child_spec({config, index}) do
+    %{
+      id: {config.module, __MODULE__, index},
+      start: {__MODULE__, :start_link, [config, index]},
+      shutdown: config.shutdown_grace_period
+    }
+  end
+
+  def name(config, index) do
+    Faktory.Registry.name({config.module, __MODULE__, index})
+  end
+
   def start_link(config, index) do
-    name = Faktory.Registry.name({config.module, __MODULE__, index})
-    GenStage.start_link(__MODULE__, {config, index}, name: name)
+    GenStage.start_link(__MODULE__, {config, index}, name: name(config, index))
   end
 
   def init({config, index}) do
@@ -26,7 +37,7 @@ defmodule Faktory.Runner do
     middleware = config.middleware
     jobtype_map = config.jobtype_map
 
-    Faktory.Logger.info "START 🚀 #{inspect self()} jid-#{jid} (#{jobtype}) #{inspect args}"
+    Faktory.Logger.info "R 🚀 #{inspect self()} jid-#{jid} (#{jobtype}) #{inspect args}"
 
     # I should probably make this a struct, but it seems weird to have a module without any
     # functions... that's probably just OO brain damage over the years.
@@ -70,7 +81,7 @@ defmodule Faktory.Runner do
   # subscribe to fetcher 2.
   defp subscribe_to(config, index) do
     fetcher_index = rem(index, config.fetcher_count) + 1
-    fetcher_name = Faktory.Fetcher.name(config, fetcher_index)
+    fetcher_name = Faktory.Stage.Fetcher.name(config, fetcher_index)
     [{fetcher_name, max_demand: 1, min_demand: 0}]
   end
 
