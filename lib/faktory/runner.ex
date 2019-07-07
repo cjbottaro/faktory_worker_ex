@@ -9,7 +9,7 @@ defmodule Faktory.Runner do
   end
 
   def init({config, index}) do
-    :ok = Faktory.SignalHandler.register_worker
+    :ok = Faktory.SignalHandler.register_worker |> IO.inspect
     {:producer_consumer, config, subscribe_to: subscribe_to(config, index)}
   end
 
@@ -70,7 +70,7 @@ defmodule Faktory.Runner do
   # subscribe to fetcher 2.
   defp subscribe_to(config, index) do
     fetcher_index = rem(index, config.fetcher_count) + 1
-    fetcher_name = Faktory.Registry.name({config.module, Faktory.Fetcher, fetcher_index})
+    fetcher_name = Faktory.Fetcher.name(config, fetcher_index)
     [{fetcher_name, max_demand: 1, min_demand: 0}]
   end
 
