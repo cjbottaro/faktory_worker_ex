@@ -7,6 +7,7 @@
 * Implement Redis Serialization Protocol (RESP). (PR [#40](https://github.com/cjbottaro/faktory_worker_ex/pull/40))
 * Handle `quiet` and `terminate` from Faktory server. (PR [#42](https://github.com/cjbottaro/faktory_worker_ex/pull/42))
 * Shutdown grace period. (PR [#43](https://github.com/cjbottaro/faktory_worker_ex/pull/43))
+* `priority_queues: false`. See module documentation on `Faktory.Worker`. (PR [#44](https://github.com/cjbottaro/faktory_worker_ex/pull/44))
 * Use Jason instead of Poison.
 
 
