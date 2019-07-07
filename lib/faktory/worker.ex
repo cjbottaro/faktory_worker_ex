@@ -60,7 +60,8 @@ defmodule Faktory.Worker do
     password: nil,
     use_tls: false,
     fetcher_count: 1,
-    reporter_count: 1
+    reporter_count: 1,
+    shutdown_grace_period: 25_000
   ]
 
   @doc """
@@ -77,7 +78,8 @@ defmodule Faktory.Worker do
     password: nil,
     use_tls: false,
     fetcher_count: 1,
-    reporter_count: 1
+    reporter_count: 1,
+    shutdown_grace_period: 25_000
   ]
   ```
   """
@@ -134,7 +136,8 @@ defmodule Faktory.Worker do
     password: nil,
     use_tls: false,
     fetcher_count: 1,
-    reporter_count: 1
+    reporter_count: 1,
+    shutdown_grace_period: 25_000
   ]
   ```
 

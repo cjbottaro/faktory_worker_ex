@@ -25,7 +25,8 @@ defmodule Faktory.Supervisor do
     runners = Enum.map 1..config.concurrency, fn index ->
       %{
         id: {config.module, Faktory.Runner, index},
-        start: {Faktory.Runner, :start_link, [config, index]}
+        start: {Faktory.Runner, :start_link, [config, index]},
+        shutdown: config.shutdown_grace_period
       }
     end
 
