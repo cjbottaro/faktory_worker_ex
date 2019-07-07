@@ -41,6 +41,7 @@ defmodule Faktory.Stage.Fetcher do
     conn = state.conn
     queues = state.config.queues
 
+    # Blocks for up to two seconds before returning a job or nil.
     case Faktory.Protocol.fetch(conn, queues) do
 
       # Job found, send it down the pipeline!
