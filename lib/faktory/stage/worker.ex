@@ -37,7 +37,7 @@ defmodule Faktory.Stage.Worker do
     middleware = config.middleware
     jobtype_map = config.jobtype_map
 
-    Faktory.Logger.info "R 🚀 #{inspect self()} jid-#{jid} (#{jobtype}) #{inspect args}"
+    Faktory.Logger.info "S 🚀 #{inspect self()} jid-#{jid} (#{jobtype}) #{inspect args}"
 
     # I should probably make this a struct, but it seems weird to have a module without any
     # functions... that's probably just OO brain damage over the years.

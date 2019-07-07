@@ -73,7 +73,7 @@ defmodule Faktory.Stage.Reporter do
 
   defp log(cmd, report) do
     status = case cmd do
-      "ack"  -> "S 🥂"
+      "ack"  -> "A 🥂"
       "fail" -> "F 💥"
     end
 
