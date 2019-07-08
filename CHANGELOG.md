@@ -8,6 +8,7 @@
 * Handle `quiet` and `terminate` from Faktory server. (PR [#42](https://github.com/cjbottaro/faktory_worker_ex/pull/42))
 * Shutdown grace period. (PR [#43](https://github.com/cjbottaro/faktory_worker_ex/pull/43))
 * `priority_queues: false`. See module documentation on `Faktory.Worker`. (PR [#44](https://github.com/cjbottaro/faktory_worker_ex/pull/44))
+* Specify job options on `use Faktory.Job`. (PR [#45](https://github.com/cjbottaro/faktory_worker_ex/pull/45))
 * Use Jason instead of Poison.
 
 
