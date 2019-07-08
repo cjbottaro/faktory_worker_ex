@@ -6,17 +6,26 @@ defmodule Faktory do
   # Represents a unique job id.
   @type jid :: binary
 
+  # A Faktory job.
+  @type job :: map
+
   # A connection to the Faktory server.
   @type conn :: pid
 
   alias Faktory.{Logger, Protocol, Utils}
 
-  defdelegate app_name, to: Utils
-  defdelegate env, to: Utils
+  @doc false
+  defdelegate get_all_env(), to: Utils
+
+  @doc false
+  defdelegate get_env(key, default \\ nil), to: Utils
+
+  @doc false
+  defdelegate put_env(key, value), to: Utils
 
   @doc false
   def start_workers? do
-    !!get_env(:start_workers)
+    !!get_env(:start_workers) or !!System.get_env("START_FAKTORY_WORKERS")
   end
 
   @doc """
@@ -31,7 +40,7 @@ defmodule Faktory do
     push("BoringWork", [retry: 0, backtrace: 10], [])
   ```
   """
-  @spec push(atom | binary, Keyword.t, [term]) :: jid
+  @spec push(atom | binary, Keyword.t, [term]) :: job
   def push(module, args, options \\ []) do
     import Faktory.Utils, only: [new_jid: 0, if_test: 1]
     alias Faktory.Middleware
@@ -90,41 +99,11 @@ defmodule Faktory do
   end
 
   @doc """
-  Return the log level.
+  Need a raw connection to the Faktory server?
 
-  The log level can be set to anything greater than or equal to Logger's level.
-
-  ```elixir
-  use Mix.Config
-  config faktory_worker_ex, log_level: :info
-  ```
-  """
-  @spec log_level :: atom
-  def log_level do
-    get_env(:log_level) || Application.get_env(:logger, :level)
-  end
-
-  @doc false
-  def get_all_env do
-    Application.get_all_env(app_name())
-  end
-
-  @doc false
-  def get_env(key, default \\ nil) do
-     Application.get_env(app_name(), key, default)
-  end
-
-  @doc false
-  def put_env(key, value) do
-    Application.put_env(app_name(), key, value)
-  end
-
-  @doc """
-    Need a raw connection to the Faktory server?
-
-    This checks one out, passes it to the given function, then checks it back
-    in. See the (undocument) `Faktory.Protocol` module for what you can do
-    with a connection.
+  This checks one out, passes it to the given function, then checks it back
+  in. See the (undocument) `Faktory.Protocol` module for what you can do
+  with a connection.
   """
   @spec with_conn(Keyword.t, (conn -> term)) :: term
   def with_conn(options, func) do
