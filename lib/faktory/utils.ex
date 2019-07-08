@@ -6,14 +6,6 @@ defmodule Faktory.Utils do
 
   def app_name, do: @app_name
 
-  def module_name(string) when is_binary(string) do
-    String.replace_prefix(string, "Elixir.", "")
-  end
-
-  def module_name(module) when is_atom(module) do
-    module |> Module.split |> Enum.join(".")
-  end
-
   # This will convert an enum into a map with string keys.
   def stringify_keys(map) do
     Enum.reduce map, %{}, fn {k, v}, acc ->

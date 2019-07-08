@@ -41,12 +41,6 @@ defmodule Faktory do
     client = options[:client] || get_env(:default_client)
     jobtype = options[:jobtype]
 
-    # if !Configuration.exists?(client) do
-    #   name = Faktory.Utils.module_name(client)
-    #   raise Faktory.Error.ClientNotConfigured,
-    #     message: "#{name} not configured"
-    # end
-
     job = options
       |> Keyword.merge(jid: new_jid(), jobtype: jobtype, args: args)
       |> Utils.stringify_keys
