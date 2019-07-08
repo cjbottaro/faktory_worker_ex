@@ -31,7 +31,7 @@ The following diagram shows all the stages involved in a `Faktory.Worker`.
 1. The worker stages run the jobs and emit statuses to the reporter stage.
 1. The reporter stage writes the status to logs and sends an ACK or FAIL back to the Faktory server.
 
-The number of jobs that can be processed concurrently is equal to the number of runners, which is set by the `concurrency` option.
+The number of jobs that can be processed concurrently is equal to the number of worker stages, which is set by the `concurrency` option.
 
 I have no idea why the queue stage is necessary when there are multiple fetchers. It has something to do with how demand works that I don't understand. If all the worker stages subscribe to all the fetcher stages, then something messes up with demand and jobs don't flow through the pipeline in real time.
 
@@ -67,6 +67,6 @@ At worst, a job will be processed more than once due to a process crashing befor
 
 ## Memory bloat?
 
-Fetchers, runners, and reporters are all long running processes, but each job is executed in its own process.
+Fetcher stages, worker stages, and reporter stages are all long running processes, but each job is executed in its own process.
 
 It's like the Resque model, but efficient because of BEAM processes vs Unix processes.
