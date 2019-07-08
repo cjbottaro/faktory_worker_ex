@@ -4,7 +4,7 @@ This document describes some high level design concepts.
 
 ## Workers are GenStage pipelines
 
-The following diagram shows all the stages involved in a `Worker`.
+The following diagram shows all the stages involved in a `Faktory.Worker`.
 
 ```
               +---------+                         +--------+
@@ -28,12 +28,12 @@ The following diagram shows all the stages involved in a `Worker`.
 
 1. The fetcher stages ask the Faktory server for jobs.
 1. The queue stage gets the jobs from the fetcher stages and passes them along to the worker stages.
-1. The worker stages run the jobs an emit statuses to the reporter stage.
+1. The worker stages run the jobs and emit statuses to the reporter stage.
 1. The reporter stage writes the status to logs and sends an ACK or FAIL back to the Faktory server.
 
 The number of jobs that can be processed concurrently is equal to the number of runners, which is set by the `concurrency` option.
 
-I have no idea why the queue stage is necessary when there are multiple fetchers. It has something to do with how demand works that I don't understand. If all the worker stages subscribe to all the fetcher stages, then something messes up with demand and jobs don't flow through the pipe in real time.
+I have no idea why the queue stage is necessary when there are multiple fetchers. It has something to do with how demand works that I don't understand. If all the worker stages subscribe to all the fetcher stages, then something messes up with demand and jobs don't flow through the pipeline in real time.
 
 ## Worker Connections
 
@@ -41,6 +41,8 @@ These are the stages (or processes) that make connections to the Faktory server:
 1. Fetcher stages (for fetching jobs)
 1. Reporter stage (for acking or failing jobs)
 1. Heartbeat process (periodically pings Faktory server and listens for `quiet` and `termnate` messages)
+
+Note that `concurrency` (what defines how many worker stages there) has no bearing on number of connections to the Faktory server.
 
 ## Scaling
 
