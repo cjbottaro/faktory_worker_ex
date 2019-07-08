@@ -1,11 +1,6 @@
 defmodule Faktory.Utils do
   @moduledoc false
 
-  # Retain this at compile time since Mix.* will not be available in release builds
-  @app_name Mix.Project.config[:app]
-
-  def app_name, do: @app_name
-
   # This will convert an enum into a map with string keys.
   def stringify_keys(map) do
     Enum.reduce map, %{}, fn {k, v}, acc ->
@@ -45,15 +40,6 @@ defmodule Faktory.Utils do
     (System.monotonic_time(:millisecond) - start_time) / 1000
   end
 
-  def env do
-    cond do
-      function_exported?(Mix, :env, 1) -> Mix.env
-      Application.get_env(@app_name, :env) -> Application.get_env(@app_name, :env)
-      Map.has_key?(System.get_env, "MIX_ENV") -> System.get_env("MIX_ENV")
-      true -> :dev
-    end
-  end
-
   def hash_password(password, salt, iterations) do
     1..iterations
     |> Enum.reduce(password <> salt, fn(_i, acc) ->
@@ -63,8 +49,23 @@ defmodule Faktory.Utils do
     |> String.downcase()
   end
 
+  @doc false
+  def get_all_env do
+    Application.get_all_env(:faktory_worker_ex)
+  end
+
+  @doc false
+  def get_env(key, default \\ nil) do
+     Application.get_env(:faktory_worker_ex, key, default)
+  end
+
+  @doc false
+  def put_env(key, value) do
+    Application.put_env(:faktory_worker_ex, key, value)
+  end
+
   defmacro if_test(do: block) do
-    if Faktory.Utils.env == :test do
+    if get_env(:test) do
       quote do: unquote(block)
     end
   end
