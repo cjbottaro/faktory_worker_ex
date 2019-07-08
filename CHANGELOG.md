@@ -10,6 +10,7 @@ More info in the linked pull requests.
 * Shutdown grace period. (PR [#43](https://github.com/cjbottaro/faktory_worker_ex/pull/43))
 * `priority_queues: false`. See module documentation on `Faktory.Worker`. (PR [#44](https://github.com/cjbottaro/faktory_worker_ex/pull/44))
 * Specify job options on `use Faktory.Job`. (PR [#45](https://github.com/cjbottaro/faktory_worker_ex/pull/45))
+* Support for Elixir 1.9 releases. (PR [#46](https://github.com/cjbottaro/faktory_worker_ex/pull/46))
 * Use Jason instead of Poison.
 
 
