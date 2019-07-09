@@ -7,12 +7,6 @@ defmodule Faktory.Connection do
 
   @default_timeout 4000
 
-  # This is a hidden option for myself. When my laptop goes to sleep,
-  # it causes my entire worker supervision tree to crash. I tracked it
-  # down to a recv timing out (Connection.call) in the fetcher stage.
-  # raising this to something like 10_000 fixes the problem.
-  @connection_call_timeout Faktory.get_env(:connection_call_timeout, 5000)
-
   def start_link(config) do
     Connection.start_link(__MODULE__, config)
   end
@@ -26,7 +20,7 @@ defmodule Faktory.Connection do
   end
 
   def recv(conn, size) when is_pid(conn) do
-    Connection.call(conn, {:recv, size}, @connection_call_timeout)
+    Connection.call(conn, {:recv, size})
   end
 
   def recv(state, size, options \\ []) when is_map(state) do
