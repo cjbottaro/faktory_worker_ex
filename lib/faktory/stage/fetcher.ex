@@ -5,31 +5,19 @@ defmodule Faktory.Stage.Fetcher do
 
   use GenStage
 
-  def queues(config) do
-    if config.priority_queues do
-      [Enum.join(config.queues, " ")]
-    else
-      config.queues
-    end
-  end
-
-  def child_spec({config, queue}) do
+  def child_spec(config) do
     %{
-      id: {config.module, __MODULE__, queue},
-      start: {__MODULE__, :start_link, [config, queue]}
+      id: {config.module, __MODULE__},
+      start: {__MODULE__, :start_link, [config]}
     }
   end
 
-  def name(config, queue) do
-    Faktory.Registry.name({config.module, __MODULE__, queue})
+  def name(config) do
+    Faktory.Registry.name({config.module, __MODULE__, :fetcher})
   end
 
-  def names(config) do
-    Enum.map(queues(config), &name(config, &1))
-  end
-
-  def start_link(config, queue) do
-    GenStage.start_link(__MODULE__, config, name: name(config, queue))
+  def start_link(config) do
+    GenStage.start_link(__MODULE__, config, name: name(config))
   end
 
   def init(config) do

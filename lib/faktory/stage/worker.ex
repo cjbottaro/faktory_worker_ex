@@ -39,8 +39,8 @@ defmodule Faktory.Stage.Worker do
 
     Faktory.Logger.info "S 🚀 #{inspect self()} jid-#{jid} (#{jobtype}) #{inspect args}"
 
-    # I should probably make this a struct, but it seems weird to have a module without any
-    # functions... that's probably just OO brain damage over the years.
+    # I should probably make this a struct, but it seems weird to have a module without
+    # any functions... that's probably just OO brain damage over the years.
     report = %{
       start_time: System.monotonic_time(:millisecond),
       worker_pid: self(),
@@ -73,16 +73,17 @@ defmodule Faktory.Stage.Worker do
 
   # I'm not sure why, but each job worker cannot subscribe to all the fetchers. I think it
   # has something to do with how demand works, but if you have 2 fetchers, 4 job workers,
-  # and enqueue 4 jobs, then 4 jobs get fetched immediately, but only two of them are processed
-  # at a time, and only by job workers 1-2. You have to enqueue 8 jobs in order to
-  # get job workers 3-4 to "wake up".
+  # and enqueue 4 jobs, then 4 jobs get fetched immediately, but only two of them are
+  # processed at a time, and only by job workers 1-2. You have to enqueue 8 jobs in order
+  # to get job workers 3-4 to "wake up".
   #
-  # Try this by enqueuing 4 jobs that Process.sleep(1000) then starting up a worker for them.
+  # Try this by enqueuing 4 jobs that Process.sleep(1000) then starting up a worker for
+  # them.
   #
-  # I'm not sure why, but if we put a queue stage between the workers and fetchers, then
-  # everything works fine.
+  # I don't think it makes sense to have multiple fetchers anyway. Current solution is to
+  # only allow one fetcher.
   defp subscribe_to(config) do
-    [{Faktory.Stage.Queue.name(config), max_demand: 1, min_demand: 0}]
+    [{Faktory.Stage.Fetcher.name(config), max_demand: 1, min_demand: 0}]
   end
 
 end
