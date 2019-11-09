@@ -56,20 +56,6 @@ defmodule Faktory.Worker do
   running jobs to finish after receiving instruction to shutdown. For example from
   receiving a SIGTERM, or from the Faktory server issuing a `terminate` command
   (clicking the stop button in the web UI).
-
-  ## Priority queues
-
-  By default priority queues are enabled. This means if you configure a worker to monitor
-  queues `["a", "b", "c"]`, then all messages in queue `"a"` must be fetched before going
-  on to `"b"`, and so forth.
-
-  You can disable this behavior by setting `priority_queues: false` on the worker. In this example,
-  that means three fetcher processes (and thus three connections to the Faktory server) will
-  be started. One monitoring queue `"a"`, one monitoring queue `"b"`, and one monitoring
-  queue `"c"`. Jobs will be dispatched immediately, given available capacity to process them.
-
-  Disabling priority queues also works around this limitation of the Faktory server:
-  [#232](https://github.com/contribsys/faktory/issues/232)
   """
 
   @defaults [
@@ -81,8 +67,7 @@ defmodule Faktory.Worker do
     password: nil,
     use_tls: false,
     reporter_count: 1,
-    shutdown_grace_period: 25_000,
-    priority_queues: true
+    shutdown_grace_period: 25_000
   ]
 
   @doc """
@@ -100,7 +85,6 @@ defmodule Faktory.Worker do
     use_tls: false,
     reporter_count: 1,
     shutdown_grace_period: 25_000,
-    priority_queues: true
   ]
   ```
   """
@@ -158,7 +142,6 @@ defmodule Faktory.Worker do
     use_tls: false,
     reporter_count: 1,
     shutdown_grace_period: 25_000,
-    priority_queues: true
   ]
   ```
 
