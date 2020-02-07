@@ -14,48 +14,30 @@ defmodule Faktory.Supervisor do
       start: {Faktory.Heartbeat, :start_link, [config]}
     }
 
-    name = Faktory.Registry.name(config.module, :job_queue)
-    job_queue = %{
-      id: {config.module, :job_queue},
-      start: {BlockingQueue, :start_link, [config.concurrency, [name: name]]}
-    }
-
-    name = Faktory.Registry.name(config.module, :report_queue)
-    report_queue = %{
-      id: {config.module, :report_queue},
-      start: {BlockingQueue, :start_link, [config.concurrency * 3, [name: name]]}
-    }
-
     # TODO make the count configurable
-    producers = Enum.map 1..1, fn index ->
+    fetchers = Enum.map 1..config.fetcher_count, fn index ->
       %{
-        id: {config.module, Faktory.Producer, index},
-        start: {Faktory.Producer, :start_link, [config]}
+        id: {config.module, Faktory.Fetcher, index},
+        start: {Faktory.Fetcher, :start_link, [config, index]}
       }
     end
 
-    consumers = Enum.map 1..config.concurrency, fn index ->
+    runners = Enum.map 1..config.concurrency, fn index ->
       %{
-        id: {config.module, Faktory.Consumer, index},
-        start: {Faktory.Consumer, :start_link, [config]}
+        id: {config.module, Faktory.Runner, index},
+        start: {Faktory.Runner, :start_link, [config, index]}
       }
     end
 
     # TODO make the count configurable
-    reporters = Enum.map 1..1, fn index ->
+    reporters = Enum.map 1..config.reporter_count, fn index ->
       %{
         id: {config.module, Faktory.Reporter, index},
-        start: {Faktory.Reporter, :start_link, [config]}
+        start: {Faktory.Reporter, :start_link, [config, index]}
       }
     end
 
-    children = [
-      heartbeat,
-      job_queue,
-      report_queue
-      | producers ++ consumers ++ reporters
-    ]
-
+    children = [heartbeat | fetchers ++ runners ++ reporters]
     Supervisor.init(children, strategy: :one_for_one)
   end
 

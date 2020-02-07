@@ -1,5 +1,17 @@
 # faktory_worker_ex changes
 
+## 0.8.0
+-----------
+* Use GenStage instead of BlockingQueue. (PR [#36](https://github.com/cjbottaro/faktory_worker_ex/pull/36))
+* Find the right job module when jobtype doesn't match module name. (PR [#35](https://github.com/cjbottaro/faktory_worker_ex/pull/35))
+* Graceful shutdown on SIGTERM. (PR [#41](https://github.com/cjbottaro/faktory_worker_ex/pull/41))
+* Use Jason instead of Poison.
+
+
+## 0.7.1
+-----------
+* Fix `mix faktory` not respecting CLI args.
+
 ## 0.7.0
 -----------
 * The great simplication refactor; everything done in this version is to reduce conceptual complexity and make the code easier to read and understand.

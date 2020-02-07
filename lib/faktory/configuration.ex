@@ -12,11 +12,25 @@ defmodule Faktory.Configuration do
       |> put_wid(module.type) # Client connection don't have wid.
       |> resolve_all_env_vars
       |> Keyword.put_new(:module, module)
+      |> Keyword.put(:jobtype_map, jobtype_map(module.otp_app))
+      |> Keyword.merge(Faktory.get_env(:cli_options) || [])
       |> normalize
       |> Keyword.put(:configured, true)
       Application.put_env(module.otp_app, module, config)
       call(module, defaults)
     end
+  end
+
+  defp jobtype_map(otp_app) do
+    {:ok, modules} = :application.get_key(otp_app, :modules)
+    Enum.reduce(modules, %{}, fn module, acc ->
+      behaviours = module.__info__(:attributes)[:behaviour] || []
+      if Faktory.Job in behaviours do
+        Map.put(acc, module.faktory_options[:jobtype], module)
+      else
+        acc
+      end
+    end)
   end
 
   defp put_wid(config, :worker), do: Keyword.put(config, :wid, Faktory.Utils.new_wid)

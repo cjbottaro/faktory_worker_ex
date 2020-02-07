@@ -8,10 +8,10 @@ defmodule Faktory.ConnectionTest do
 
   test "handshake" do
     hi = "+HI"
-      <> Poison.encode!(%{v: 2})
+      <> Jason.encode!(%{v: 2})
       <> "\r\n"
     hello = "HELLO "
-      <> Poison.encode!(%{
+      <> Jason.encode!(%{
         wid: "123abc",
         v: 2,
         pid: Utils.unix_pid,

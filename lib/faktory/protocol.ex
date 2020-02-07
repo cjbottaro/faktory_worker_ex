@@ -7,7 +7,7 @@ defmodule Faktory.Protocol do
   def push(conn, job) when is_list(job), do: push(conn, Map.new(job))
 
   def push(conn, job) do
-    payload = Poison.encode!(job)
+    payload = Jason.encode!(job)
 
     with :ok <- send(conn, "PUSH #{payload}"),
       {:ok, "+OK"} <- recv(conn, :line)
@@ -27,15 +27,15 @@ defmodule Faktory.Protocol do
       {:ok, json} <- recv(conn, String.to_integer(size)),
       {:ok, ""} <- recv(conn, :line)
     do
-      Poison.decode!(json)
+      {:ok, Jason.decode!(json)}
     else
-      {:size, "-1"} -> nil
+      {:size, "-1"} -> {:ok, nil}
       error -> error
     end
   end
 
   def ack(conn, jid) when is_binary(jid) do
-    payload = %{"jid" => jid} |> Poison.encode!
+    payload = %{"jid" => jid} |> Jason.encode!
 
     with :ok <- send(conn, "ACK #{payload}"),
       {:ok, "+OK"} <- recv(conn, :line)
@@ -50,7 +50,7 @@ defmodule Faktory.Protocol do
       errtype: errtype,
       message: message,
       backtrace: backtrace
-    } |> Poison.encode!
+    } |> Jason.encode!
 
     with :ok <- send(conn, "FAIL #{payload}"),
       {:ok, "+OK"} <- recv(conn, :line)
@@ -66,19 +66,19 @@ defmodule Faktory.Protocol do
       {:ok, json} <- recv(conn, size),
       {:ok, ""} <- recv(conn, :line)
     do
-      Poison.decode(json)
+      Jason.decode(json)
     end
   end
 
   def beat(conn, wid) do
-    payload = %{wid: wid} |> Poison.encode!
+    payload = %{wid: wid} |> Jason.encode!
 
     with :ok <- send(conn, "BEAT #{payload}"),
       {:ok, "+OK"} <- recv(conn, :line)
     do
       :ok
     else
-      {:ok, json} -> {:ok, Poison.decode!(json)}
+      {:ok, json} -> {:ok, Jason.decode!(json)}
       error -> error
     end
   end
