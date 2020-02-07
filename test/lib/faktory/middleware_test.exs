@@ -52,6 +52,7 @@ defmodule Faktory.MiddlewareTest do
 
     Faktory.Middleware.traverse(job, chain, fn job ->
       assert job.args == [:c, :b, :a]
+      job
     end)
 
     assert_receive {:before_a, [:a]}
@@ -63,5 +64,4 @@ defmodule Faktory.MiddlewareTest do
     assert_receive {:before_c, [:c, :b, :a]}
     assert_receive {:after_c, [:c, :b, :a]}
   end
-
 end
