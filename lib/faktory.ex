@@ -47,9 +47,11 @@ defmodule Faktory do
     #     message: "#{name} not configured"
     # end
 
+    jid = new_jid()
+
     job =
       options
-      |> Keyword.merge(jid: new_jid(), jobtype: jobtype, args: args)
+      |> Keyword.merge(jid: jid, jobtype: jobtype, args: args)
       |> Utils.stringify_keys()
 
     # This is weird, middleware is configured in the client config module,
@@ -63,25 +65,15 @@ defmodule Faktory do
 
     # To facilitate testing, we keep a map of jid -> pid and send messages to
     # the pid at various points in the job's lifecycle.
-    if_test(do: TestJidPidMap.register(job["jid"]))
+    if_test(do: TestJidPidMap.register(jid))
 
     response =
       Middleware.traverse(job, middleware, fn job ->
-        with_conn(options, fn conn ->
-          case Protocol.push(conn, job) do
-            jid when is_binary(jid) ->
-              jid
-
-            {:error, :closed} ->
-              Logger.debug("Connection closed but ignored!")
-              {:error, :closed}
-          end
-        end)
-        |> IO.inspect(label: "with conn response")
+        with_conn(options, &Protocol.push(&1, job))
       end)
 
     case response do
-      jid when is_binary(jid) ->
+      {:ok, ^jid} ->
         %{"jid" => jid, "args" => args} = job
         Logger.debug("Q #{inspect(self())} jid-#{jid} (#{jobtype}) #{inspect(args)}")
         {:ok, job}
