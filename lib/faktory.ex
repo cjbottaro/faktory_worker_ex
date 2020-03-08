@@ -66,14 +66,17 @@ defmodule Faktory do
     # the pid at various points in the job's lifecycle.
     if_test do: TestJidPidMap.register(job["jid"])
 
-    Middleware.traverse(job, middleware, fn job ->
+    result = Middleware.traverse(job, middleware, fn job ->
       with_conn(options, &Protocol.push(&1, job))
     end)
 
-    %{ "jid" => jid, "args" => args } = job
-    Logger.info "Q 🕒 #{inspect self()} jid-#{jid} (#{jobtype}) #{inspect(args)}"
-
-    job
+    case result do
+      {:ok, _} ->
+        %{ "jid" => jid, "args" => args } = job
+        Logger.info "Q 🕒 #{inspect self()} jid-#{jid} (#{jobtype}) #{inspect(args)}"
+        {:ok, job}
+      error -> error
+    end
   end
 
   @doc """
