@@ -30,10 +30,15 @@ defmodule Faktory.Configuration do
 
     Enum.reduce(modules, %{}, fn module, acc ->
       behaviours =
-        if Kernel.function_exported?(module, :__info__, 1) do
-          module.__info__(:attributes)[:behaviour] || []
-        else
-          module.module_info(:attributes)[:behaviour] || []
+        cond do
+          Kernel.function_exported?(module, :__info__, 1) ->
+            module.__info__(:attributes)[:behaviour] || []
+
+          Kernel.function_exported?(module, :module_info, 1) ->
+            module.module_info(:attributes)[:behaviour] || []
+
+          true ->
+            []
         end
 
       if Faktory.Job in behaviours do
