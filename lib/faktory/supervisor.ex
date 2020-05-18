@@ -11,7 +11,6 @@ defmodule Faktory.Supervisor do
   def init(config) do
     heartbeat = {Faktory.Heartbeat, config}
     fetcher = {Faktory.Stage.Fetcher, config}
-    # reporter = {Faktory.Reporter, config}
     tracker = {Faktory.Tracker, config}
 
     workers = Enum.map 1..config.concurrency, fn index ->
@@ -19,7 +18,10 @@ defmodule Faktory.Supervisor do
     end
 
     # Shutdown order is very important.
-    # Reporter need to shutdown last since they need to fail any in-flight jobs.
+    # Fetcher needs to shutdown first (brutal kill is fine) so no more jobs get
+    # plucked from the queue while we're shutting down. The Tracker needs to
+    # shutdown last(ish) so it can fail any jobs didn't complete in the shutdown
+    # grace period.
     [heartbeat, tracker, workers, fetcher]
     |> List.flatten()
     |> Supervisor.init(strategy: :one_for_one)
