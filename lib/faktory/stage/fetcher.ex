@@ -74,7 +74,7 @@ defmodule Faktory.Stage.Fetcher do
         time = Faktory.Utils.exp_backoff(state.error_count)
         Faktory.Logger.warn("Network error during fetch: #{reason} -- retrying in #{time/1000}s")
         Process.send_after(self(), {:demand, 1}, time)
-        {:noreply, [], state}
+        {:noreply, [], %{state | error_count: state.error_count + 1}}
     end
 
   end
