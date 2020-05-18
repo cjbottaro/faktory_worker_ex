@@ -1,4 +1,4 @@
-use Mix.Config
+import Config
 
 config :faktory_worker_ex, :test, true
 
