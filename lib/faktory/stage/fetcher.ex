@@ -1,7 +1,7 @@
 defmodule Faktory.Stage.Fetcher do
   @moduledoc false
 
-  defstruct [:config, :conn, :error_count, :quiet]
+  defstruct [:config, :conn, :tracker, :error_count, :quiet]
 
   use GenStage
 
@@ -29,8 +29,15 @@ defmodule Faktory.Stage.Fetcher do
       config: config,
       conn: conn,
       error_count: 0,
-      quiet: false
+      quiet: false,
+      tracker: Faktory.Tracker.name(config)
     }
+
+    # Signal to the workers that they can subscribe.
+    Enum.each (1..config.concurrency), fn i ->
+      worker = Faktory.Stage.Worker.name(config, i)
+      GenServer.cast(worker, :subscribe)
+    end
 
     {:producer, state}
   end
@@ -47,6 +54,7 @@ defmodule Faktory.Stage.Fetcher do
 
       # Job found, send it down the pipeline!
       {:ok, %{} = job} ->
+        :ok = Faktory.Tracker.fetch(state.tracker, job)
         {:noreply, [job], state}
 
       # No job found, manually trigger demand since consumers
@@ -66,7 +74,7 @@ defmodule Faktory.Stage.Fetcher do
         time = Faktory.Utils.exp_backoff(state.error_count)
         Faktory.Logger.warn("Network error during fetch: #{reason} -- retrying in #{time/1000}s")
         Process.send_after(self(), {:demand, 1}, time)
-        {:noreply, [], state}
+        {:noreply, [], %{state | error_count: state.error_count + 1}}
     end
 
   end

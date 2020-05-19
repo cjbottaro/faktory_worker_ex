@@ -20,33 +20,29 @@ defmodule Faktory.Stage.Worker do
   end
 
   def init(config) do
-    Faktory.Logger.debug "Worker stage #{inspect self()} starting up"
     Process.flag(:trap_exit, true) # For shutdown grace period, see supervisor.
-    {:producer_consumer, config, subscribe_to: subscribe_to(config)}
+    Faktory.Logger.debug "Worker stage #{inspect self()} starting up"
+    state = %{config: config, tracker: Faktory.Tracker.name(config)}
+    {:consumer, state} # Delay producer subscription until fetcher signals it's ready.
   end
 
-  # I originally tried returning [] here and emitting the events asynchronously in
-  # handle_info/2 callbacks. That doesn't work because by default, GenStage will
-  # send demand immediately after this function returns. It's a big pain to go into
-  # manual mode and manage subscriptions/demand youself, so we're just going to do the
-  # work synchonously here.
-  def handle_events([job], _from, config) do
+  def handle_cast(:subscribe, state) do
+    :ok = GenStage.async_subscribe(self(),
+      to: Faktory.Stage.Fetcher.name(state.config),
+      min_demand: 0,
+      max_demand: 1
+    )
+    {:noreply, [], state}
+  end
+
+  def handle_events([job], _from, state) do
+    import Faktory.Utils, only: [if_test: 1]
+
     jid = job["jid"]
-    args = job["args"]
-    jobtype = job["jobtype"]
-    middleware = config.middleware
-    jobtype_map = config.jobtype_map
+    middleware = state.config.middleware
+    jobtype_map = state.config.jobtype_map
 
-    Faktory.Logger.info "S 🚀 #{inspect self()} jid-#{jid} (#{jobtype}) #{inspect args}"
-
-    # I should probably make this a struct, but it seems weird to have a module without
-    # any functions... that's probably just OO brain damage over the years.
-    report = %{
-      start_time: System.monotonic_time(:millisecond),
-      worker_pid: self(),
-      job: job,
-      error: nil
-    }
+    :ok = Faktory.Tracker.start(state.tracker, jid)
 
     {pid, ref} = spawn_monitor fn ->
       Faktory.Middleware.traverse(job, middleware, fn job ->
@@ -56,34 +52,26 @@ defmodule Faktory.Stage.Worker do
       end)
     end
 
-    # Block until job is finished. If there is an error, update our report.
-    report = receive do
+    # Block until job is finished.
+    receive do
       {:DOWN, ^ref, :process, ^pid, :normal} ->
-        %{report | error: nil}
+        :ok = Faktory.Tracker.ack(state.tracker, jid)
+        if_test do: test_results(jid)
       {:DOWN, ^ref, :process, ^pid, reason} ->
-        %{report | error: Faktory.Error.from_reason(reason)}
+        :ok = Faktory.Tracker.fail(state.tracker, jid, reason)
+        if_test do: test_results(jid, reason)
     end
 
-    {:noreply, [report], config}
+    {:noreply, [], state}
   end
 
   def terminate(_reason, _state) do
     Faktory.Logger.debug "Worker stage #{inspect self()} shutting down"
   end
 
-  # I'm not sure why, but each job worker cannot subscribe to all the fetchers. I think it
-  # has something to do with how demand works, but if you have 2 fetchers, 4 job workers,
-  # and enqueue 4 jobs, then 4 jobs get fetched immediately, but only two of them are
-  # processed at a time, and only by job workers 1-2. You have to enqueue 8 jobs in order
-  # to get job workers 3-4 to "wake up".
-  #
-  # Try this by enqueuing 4 jobs that Process.sleep(1000) then starting up a worker for
-  # them.
-  #
-  # I don't think it makes sense to have multiple fetchers anyway. Current solution is to
-  # only allow one fetcher.
-  defp subscribe_to(config) do
-    [{Faktory.Stage.Fetcher.name(config), max_demand: 1, min_demand: 0}]
+  defp test_results(jid, reason \\ nil) do
+    error = reason && Faktory.Error.from_reason(reason)
+    send TestJidPidMap.get(jid), %{jid: jid, error: error}
   end
 
 end
