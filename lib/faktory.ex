@@ -40,7 +40,7 @@ defmodule Faktory do
     push("BoringWork", [retry: 0, backtrace: 10], [])
   ```
   """
-  @spec push(atom | binary, Keyword.t, [term]) :: {:ok, job} | {:error, reason :: binary}
+  @spec push(atom | binary, [term], Keyword.t) :: {:ok, job} | {:error, reason :: binary}
   def push(module, args, options \\ []) do
     import Faktory.Utils, only: [new_jid: 0, if_test: 1]
     alias Faktory.Middleware
