@@ -82,7 +82,7 @@ defmodule Faktory do
         Logger.info "Q 🕒 #{inspect self()} jid-#{jid} (#{jobtype}) #{inspect(args)}"
         {:ok, job}
 
-      error -> error
+      {:error, reason} -> {:error, reason}
     end
   end
 
