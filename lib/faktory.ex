@@ -40,19 +40,25 @@ defmodule Faktory do
     push("BoringWork", [retry: 0, backtrace: 10], [])
   ```
   """
-  @spec push(atom | binary, Keyword.t, [term]) :: job
+  @spec push(atom | binary, Keyword.t, [term]) :: {:ok, job} | {:error, reason :: binary}
   def push(module, args, options \\ []) do
     import Faktory.Utils, only: [new_jid: 0, if_test: 1]
     alias Faktory.Middleware
 
-    module = Module.safe_concat([module])
-    options = Keyword.merge(module.faktory_options, options)
+    module = Module.concat([module])
+
+    options = if function_exported?(module, :faktory_options, 0) do
+      Keyword.merge(module.faktory_options, options)
+    else
+      options
+    end
+
     client = options[:client] || get_env(:default_client)
     jobtype = options[:jobtype]
 
     job = options
-      |> Keyword.merge(jid: new_jid(), jobtype: jobtype, args: args)
-      |> Utils.stringify_keys
+    |> Keyword.merge(jid: new_jid(), jobtype: jobtype, args: args)
+    |> Utils.stringify_keys
 
     # This is weird, middleware is configured in the client config module,
     # but we allow overriding in faktory_options and thus push options.
@@ -66,14 +72,18 @@ defmodule Faktory do
     # the pid at various points in the job's lifecycle.
     if_test do: TestJidPidMap.register(job["jid"])
 
-    Middleware.traverse(job, middleware, fn job ->
+    result = Middleware.traverse(job, middleware, fn job ->
       with_conn(options, &Protocol.push(&1, job))
     end)
 
-    %{ "jid" => jid, "args" => args } = job
-    Logger.info "Q 🕒 #{inspect self()} jid-#{jid} (#{jobtype}) #{inspect(args)}"
+    case result do
+      {:ok, _} ->
+        %{ "jid" => jid, "args" => args } = job
+        Logger.info "Q 🕒 #{inspect self()} jid-#{jid} (#{jobtype}) #{inspect(args)}"
+        {:ok, job}
 
-    job
+      error -> error
+    end
   end
 
   @doc """
