@@ -3,6 +3,7 @@
 ## 0.8.0
 Detailed info in the linked pull requests.
 
+* Erlang modules don't expose `__info__/1`. (PR [#58](https://github.com/cjbottaro/faktory_worker_ex/pull/58))
 * Make `Faktory.push/2` a low level API. (PR [#57](https://github.com/cjbottaro/faktory_worker_ex/pull/57))
 * Make `Faktory.push/2` return errors. (PR [#57](https://github.com/cjbottaro/faktory_worker_ex/pull/57))
 * Use GenStage instead of BlockingQueue. (PR [#36](https://github.com/cjbottaro/faktory_worker_ex/pull/36))
