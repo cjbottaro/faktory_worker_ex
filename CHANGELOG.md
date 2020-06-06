@@ -3,6 +3,7 @@
 ## 0.8.0
 Detailed info in the linked pull requests.
 
+* Make `Faktory.push/2` a low level API. (PR [#57]https://github.com/cjbottaro/faktory_worker_ex/pull/57)
 * Use GenStage instead of BlockingQueue. (PR [#36](https://github.com/cjbottaro/faktory_worker_ex/pull/36))
 * Find the right job module when jobtype doesn't match module name. (PR [#35](https://github.com/cjbottaro/faktory_worker_ex/pull/35))
 * Implement Redis Serialization Protocol (RESP). (PR [#40](https://github.com/cjbottaro/faktory_worker_ex/pull/40))
