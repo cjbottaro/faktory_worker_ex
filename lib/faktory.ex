@@ -17,14 +17,7 @@ defmodule Faktory do
 
   # A Faktory job.
   @type job :: %{
-    required(:jobtype) => binary,
-    required(:args) => [term],
-    optional(:queue) => binary,
-    optional(:jid) => binary,
-    optional(:reserve_for) => integer,
-    optional(:at) => binary,
-    optional(:retry) => integer,
-    optional(:backtrace) => integer
+    required(binary) => json
   }
 
   # A connection to the Faktory server.
@@ -67,7 +60,7 @@ defmodule Faktory do
     push(job, client: ClientFoo, middleware: TheJobMangler)
   ```
   """
-  @spec push(job :: %{binary => json}, options :: Keyword.t) :: {:ok, job} | {:error, reason :: binary}
+  @spec push(job, options :: Keyword.t) :: {:ok, job} | {:error, reason :: binary}
   def push(job, options \\ []) do
     import Faktory.Utils, only: [new_jid: 0, if_test: 1, blank?: 1]
     alias Faktory.Middleware
