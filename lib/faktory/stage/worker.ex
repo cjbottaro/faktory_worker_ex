@@ -69,9 +69,12 @@ defmodule Faktory.Stage.Worker do
     Faktory.Logger.debug "Worker stage #{inspect self()} shutting down"
   end
 
-  defp test_results(jid, reason \\ nil) do
-    error = reason && Faktory.Error.from_reason(reason)
-    send TestJidPidMap.get(jid), %{jid: jid, error: error}
+  require Faktory.Utils
+  Faktory.Utils.if_test do
+    defp test_results(jid, reason \\ nil) do
+      error = reason && Faktory.Error.from_reason(reason)
+      send TestJidPidMap.get(jid), %{jid: jid, error: error}
+    end
   end
 
 end

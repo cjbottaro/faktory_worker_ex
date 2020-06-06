@@ -6,8 +6,19 @@ defmodule Faktory do
   # Represents a unique job id.
   @type jid :: binary
 
+  @type json :: (
+    binary  |
+    integer |
+    float   |
+    nil     |
+    [json]  |
+    %{binary => json}
+  )
+
   # A Faktory job.
-  @type job :: map
+  @type job :: %{
+    required(binary) => json
+  }
 
   # A connection to the Faktory server.
   @type conn :: pid
@@ -31,49 +42,64 @@ defmodule Faktory do
   @doc """
   Lower level enqueing function.
 
-  `perform_async` delgates to this. `module` can be either an atom or string.
-  A connection is checked out from the _client_ pool.
+  Manually enqueue a Faktory job. A job is defined here:
+  https://github.com/contribsys/faktory/wiki/The-Job-Payload
+
+  This function will set the JID for you, you do not have to set it yourself.
+
+  `options` is a keyword list specifying...
+
+  `:client` Client module to use for a Faktory server connection. If omitted, the
+  default client is used.
+
+  `:middleware` Send the job through this middleware.
 
   Ex:
   ```elixir
-    push(MyFunWork, [queue: "somewhere"], [1, 2])
-    push("BoringWork", [retry: 0, backtrace: 10], [])
+    push(%{"jobtype" => "MyFunWork", "args" => [1, 2, "three"], "queue" => "somewhere"})
+    push(job, client: ClientFoo, middleware: TheJobMangler)
   ```
   """
-  @spec push(atom | binary, Keyword.t, [term]) :: job
-  def push(module, args, options \\ []) do
-    import Faktory.Utils, only: [new_jid: 0, if_test: 1]
+  @spec push(job, options :: Keyword.t) :: {:ok, job} | {:error, reason :: binary}
+  def push(job, options \\ []) do
+    import Faktory.Utils, only: [new_jid: 0, if_test: 1, blank?: 1]
     alias Faktory.Middleware
 
-    module = Module.safe_concat([module])
-    options = Keyword.merge(module.faktory_options, options)
-    client = options[:client] || get_env(:default_client)
-    jobtype = options[:jobtype]
+    if blank?(job["jobtype"]) do
+      {:error, "missing required field jobtype"}
+    else
+      client = options[:client] || get_env(:default_client)
 
-    job = options
-      |> Keyword.merge(jid: new_jid(), jobtype: jobtype, args: args)
-      |> Utils.stringify_keys
+      middleware = if Keyword.has_key?(options, :middleware) do
+        options[:middleware] || []
+      else
+        client.config[:middleware]
+      end
 
-    # This is weird, middleware is configured in the client config module,
-    # but we allow overriding in faktory_options and thus push options.
-    middleware = case options[:middleware] do
-      nil -> client.config[:middleware]
-      [] -> client.config[:middleware]
-      middleware -> middleware
+      job = if blank?(job["jid"]) do
+        Map.put(job, "jid", new_jid())
+      else
+        job
+      end
+
+      # To facilitate testing, we keep a map of jid -> pid and send messages to
+      # the pid at various points in the job's lifecycle.
+      if_test do: TestJidPidMap.register(job["jid"])
+
+      result = Middleware.traverse(job, middleware, fn job ->
+        with_conn(options, &Protocol.push(&1, job))
+      end)
+
+      case result do
+        {:ok, _} ->
+          %{ "jid" => jid, "args" => args, "jobtype" => jobtype} = job
+          Logger.info "Q 🕒 #{inspect self()} jid-#{jid} (#{jobtype}) #{inspect(args)}"
+          {:ok, job}
+
+        error -> error
+      end
     end
 
-    # To facilitate testing, we keep a map of jid -> pid and send messages to
-    # the pid at various points in the job's lifecycle.
-    if_test do: TestJidPidMap.register(job["jid"])
-
-    Middleware.traverse(job, middleware, fn job ->
-      with_conn(options, &Protocol.push(&1, job))
-    end)
-
-    %{ "jid" => jid, "args" => args } = job
-    Logger.info "Q 🕒 #{inspect self()} jid-#{jid} (#{jobtype}) #{inspect(args)}"
-
-    job
   end
 
   @doc """

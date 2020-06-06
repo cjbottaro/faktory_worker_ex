@@ -1,4 +1,5 @@
 defmodule Dev.RandJob do
+  @moduledoc false
   use Faktory.Job
 
   def perform do

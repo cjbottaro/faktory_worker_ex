@@ -1,6 +1,10 @@
 defmodule Faktory.Utils do
   @moduledoc false
 
+  def blank?(value) do
+    (value |> to_string() |> String.trim()) == ""
+  end
+
   # This will convert an enum into a map with string keys.
   def stringify_keys(map) do
     Enum.reduce map, %{}, fn {k, v}, acc ->

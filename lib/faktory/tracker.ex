@@ -1,6 +1,8 @@
 defmodule Faktory.Tracker do
+  @moduledoc false
 
   defmodule Job do
+    @moduledoc false
     defstruct [:payload, :fetch_time, :start_time, :worker_pid]
   end
 

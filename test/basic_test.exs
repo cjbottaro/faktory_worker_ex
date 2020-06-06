@@ -2,7 +2,7 @@ defmodule BasicTest do
   use ExUnit.Case, async: false
 
   test "enqueing and processing a job" do
-    job = AddWorker.perform_async([PidMap.register, 1, 2])
+    {:ok, job} = AddWorker.perform_async([PidMap.register, 1, 2])
     jid = job["jid"]
 
     assert_receive %{jid: ^jid, error: nil}
@@ -22,7 +22,7 @@ defmodule BasicTest do
   end
 
   test "worker handles exceptions" do
-    job = AddWorker.perform_async([PidMap.register, 1, "foo"])
+    {:ok, job} = AddWorker.perform_async([PidMap.register, 1, "foo"])
     jid = job["jid"]
 
     assert_receive %{jid: ^jid, error: error}
@@ -30,7 +30,7 @@ defmodule BasicTest do
   end
 
   test "worker handles executor dying from brutal kill" do
-    job = DieWorker.perform_async([:kill])
+    {:ok, job} = DieWorker.perform_async([:kill])
     jid = job["jid"]
 
     assert_receive %{jid: ^jid, error: error}
@@ -39,7 +39,7 @@ defmodule BasicTest do
   end
 
   test "worker handles executor dying from linked process" do
-    job = DieWorker.perform_async([:spawn])
+    {:ok, job} = DieWorker.perform_async([:spawn])
     jid = job["jid"]
 
     assert_receive %{jid: ^jid, error: error}

@@ -83,7 +83,7 @@ defmodule Faktory.Job do
       faktory_options(unquote(options))
 
       def perform_async(args, options \\ []) do
-        Faktory.push(__MODULE__, args, options)
+        Faktory.Job.perform_async(@faktory_options, args, options)
       end
 
     end
@@ -141,6 +141,20 @@ defmodule Faktory.Job do
       options = unquote(options)
       @faktory_options Keyword.merge(@faktory_options, options)
     end
+  end
+
+  def perform_async(faktory_options, args, options) do
+    options = Keyword.merge(faktory_options, options)
+    job = %{
+      "jobtype" => options[:jobtype],
+      "args" => args,
+      "queue" => options[:queue],
+      "reserve_for" => options[:reserve_for],
+      "at" => options[:at],
+      "retry" => options[:retry],
+      "backtrace" => options[:backtrace]
+    }
+    Faktory.push(job, options)
   end
 
 end
