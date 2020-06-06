@@ -3,12 +3,12 @@
 ## 0.8.0
 Detailed info in the linked pull requests.
 
-* Make `Faktory.push/2` a low level API. (PR [#57]https://github.com/cjbottaro/faktory_worker_ex/pull/57)
+* Make `Faktory.push/2` a low level API. (PR [#57](https://github.com/cjbottaro/faktory_worker_ex/pull/57))
 * Use GenStage instead of BlockingQueue. (PR [#36](https://github.com/cjbottaro/faktory_worker_ex/pull/36))
 * Find the right job module when jobtype doesn't match module name. (PR [#35](https://github.com/cjbottaro/faktory_worker_ex/pull/35))
 * Implement Redis Serialization Protocol (RESP). (PR [#40](https://github.com/cjbottaro/faktory_worker_ex/pull/40))
 * Handle `quiet` and `terminate` from Faktory server. (PR [#42](https://github.com/cjbottaro/faktory_worker_ex/pull/42))
-* Graceful shutdown. (PR [#43](https://github.com/cjbottaro/faktory_worker_ex/pull/43) and [56](https://github.com/cjbottaro/faktory_worker_ex/pull/56))
+* Graceful shutdown. (PR [#43](https://github.com/cjbottaro/faktory_worker_ex/pull/43), [#56](https://github.com/cjbottaro/faktory_worker_ex/pull/56))
 * `priority_queues: false`. See module documentation on `Faktory.Worker`. (PR [#44](https://github.com/cjbottaro/faktory_worker_ex/pull/44))
 * Specify job options on `use Faktory.Job`. (PR [#45](https://github.com/cjbottaro/faktory_worker_ex/pull/45))
 * Support for Elixir 1.9 releases. (PR [#46](https://github.com/cjbottaro/faktory_worker_ex/pull/46))
