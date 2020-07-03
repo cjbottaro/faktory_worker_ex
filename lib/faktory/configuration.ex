@@ -29,6 +29,11 @@ defmodule Faktory.Configuration do
     {:ok, modules} = :application.get_key(otp_app, :modules)
 
     Enum.reduce(modules, %{}, fn module, acc ->
+      # Trying to call a function on a module will implicitly load it, but
+      # function_exported?/1 will return false on unloaded modules, so we
+      # have to make sure the module is loaded before calling it.
+      {:module, ^module} = Code.ensure_loaded(module)
+      
       behaviours =
         cond do
           Kernel.function_exported?(module, :__info__, 1) ->
