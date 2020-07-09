@@ -31,7 +31,7 @@ defmodule Faktory do
     push("BoringWork", [retry: 0, backtrace: 10], [])
   ```
   """
-  @spec push(atom | binary, Keyword.t, [term]) :: jid
+  @spec push(atom | binary, Keyword.t(), [term]) :: jid
   def push(module, args, options \\ []) do
     import Faktory.Utils, only: [new_jid: 0, if_test: 1]
     alias Faktory.Middleware
@@ -47,30 +47,40 @@ defmodule Faktory do
     #     message: "#{name} not configured"
     # end
 
-    job = options
-      |> Keyword.merge(jid: new_jid(), jobtype: jobtype, args: args)
-      |> Utils.stringify_keys
+    jid = new_jid()
+
+    job =
+      options
+      |> Keyword.merge(jid: jid, jobtype: jobtype, args: args)
+      |> Utils.stringify_keys()
 
     # This is weird, middleware is configured in the client config module,
     # but we allow overriding in faktory_options and thus push options.
-    middleware = case options[:middleware] do
-      nil -> client.config[:middleware]
-      [] -> client.config[:middleware]
-      middleware -> middleware
-    end
+    middleware =
+      case options[:middleware] do
+        nil -> client.config[:middleware]
+        [] -> client.config[:middleware]
+        middleware -> middleware
+      end
 
     # To facilitate testing, we keep a map of jid -> pid and send messages to
     # the pid at various points in the job's lifecycle.
-    if_test do: TestJidPidMap.register(job["jid"])
+    if_test(do: TestJidPidMap.register(jid))
 
-    Middleware.traverse(job, middleware, fn job ->
-      with_conn(options, &Protocol.push(&1, job))
-    end)
+    response =
+      Middleware.traverse(job, middleware, fn job ->
+        with_conn(options, &Protocol.push(&1, job))
+      end)
 
-    %{ "jid" => jid, "args" => args } = job
-    Logger.info "QUEUE 🕒 #{inspect self()} jid-#{jid} (#{jobtype}) #{inspect(args)}"
+    case response do
+      {:ok, ^jid} ->
+        %{"jid" => jid, "args" => args} = job
+        Logger.debug("Q #{inspect(self())} jid-#{jid} (#{jobtype}) #{inspect(args)}")
+        {:ok, job}
 
-    job
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   @doc """
@@ -117,7 +127,7 @@ defmodule Faktory do
 
   @doc false
   def get_env(key, default \\ nil) do
-     Application.get_env(app_name(), key, default)
+    Application.get_env(app_name(), key, default)
   end
 
   @doc false
@@ -132,10 +142,9 @@ defmodule Faktory do
     in. See the (undocument) `Faktory.Protocol` module for what you can do
     with a connection.
   """
-  @spec with_conn(Keyword.t, (conn -> term)) :: term
+  @spec with_conn(Keyword.t(), (conn -> term)) :: term
   def with_conn(options, func) do
     client = options[:client] || get_env(:default_client)
     :poolboy.transaction(client, func)
   end
-
 end
