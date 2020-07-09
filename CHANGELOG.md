@@ -1,6 +1,6 @@
 # faktory_worker_ex changes
 
-## 0.8.0
+## 1.0.0
 Detailed info in the linked pull requests.
 
 * Erlang modules don't expose `__info__/1`. (PR [#58](https://github.com/cjbottaro/faktory_worker_ex/pull/58))
