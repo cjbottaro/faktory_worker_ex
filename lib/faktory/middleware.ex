@@ -88,7 +88,7 @@ defmodule Faktory.Middleware do
     walker = fn
       job, [], _next ->
         done_fn.(job)
-        job
+
       job, [middleware | chain], next ->
         monad = fn job -> next.(job, chain, next) end
         middleware.call(job, monad)
@@ -96,5 +96,4 @@ defmodule Faktory.Middleware do
 
     walker.(job, chain, walker)
   end
-
 end
