@@ -109,7 +109,8 @@ defmodule Faktory.Job do
     jobtype: "MyFunkyJob",
     retry: 25,
     middleware: [],
-    backtrace: 10
+    backtrace: 10,
+    client: nil
   ]
   ```
   """
@@ -128,7 +129,7 @@ defmodule Faktory.Job do
   MyJob.perform_async(job_args, queue: "not_default" jobtype: "Worker::MyJob")
   ```
   """
-  @callback perform_async(args :: [any], options :: Keyword.t | []) :: job
+  @callback perform_async(args :: [any], options :: Keyword.t | []) :: {:ok, job} | {:error, reason :: binary}
 
   @doc """
   Set default options for all jobs of this type.
@@ -154,7 +155,9 @@ defmodule Faktory.Job do
       "retry" => options[:retry],
       "backtrace" => options[:backtrace]
     }
-    Faktory.push(job, options)
+
+    client = options[:client] || Faktory.default_client() || raise("No default client configured")
+    client.push(job, options)
   end
 
 end

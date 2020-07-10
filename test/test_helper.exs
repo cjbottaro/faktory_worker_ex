@@ -5,7 +5,7 @@ Supervisor.start_link(
   strategy: :one_for_one
 )
 
-Faktory.flush
+Test.Client.flush()
 {:ok, _} = PidMap.start_link
 {:ok, _} = TestJidPidMap.start_link
 

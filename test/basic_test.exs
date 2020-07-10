@@ -46,4 +46,8 @@ defmodule BasicTest do
     assert error.errtype == "UndefinedFunctionError"
   end
 
+  test ":client option on job" do
+    assert CustomClientJob.faktory_options[:client] == CustomClient
+  end
+
 end

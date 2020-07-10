@@ -53,23 +53,8 @@ defmodule Faktory.Utils do
     |> String.downcase()
   end
 
-  @doc false
-  def get_all_env do
-    Application.get_all_env(:faktory_worker_ex)
-  end
-
-  @doc false
-  def get_env(key, default \\ nil) do
-     Application.get_env(:faktory_worker_ex, key, default)
-  end
-
-  @doc false
-  def put_env(key, value) do
-    Application.put_env(:faktory_worker_ex, key, value)
-  end
-
   defmacro if_test(do: block) do
-    if get_env(:test) do
+    if Faktory.get_env(:test) do
       quote do: unquote(block)
     end
   end
