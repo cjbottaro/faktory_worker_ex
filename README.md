@@ -60,7 +60,7 @@ To see command line options that can override in-app configuration.
 
 ## Configuration
 
-Compile-time config is done with `Mix.Config`.
+Compile-time config is done with `Config`.
 
 Run-time config is done with environment variables and/or an `init/1` callback.
 
@@ -95,6 +95,39 @@ config :faktory_worker_ex, :start_workers, true
 ```
 
 There is no support for command line arguments when using releases.
+
+## Using with multiple Faktory servers
+
+```elixir
+import Config
+
+config :my_app, FooClient,
+  host: "foo.faktory.myapp.com"
+
+config :my_app, BarClient,
+  host: "bar.faktory.myapp.com"
+
+defmodule FooClient do
+  use Faktory.Client, otp_app: :my_app
+end
+
+defmodule BarClient do
+  use Faktory.Client, otp_app: :my_app
+end
+
+defmodule FooJob do
+  use Faktory.Job, client: FooClient
+  def perform(), do: nil
+end
+
+defmodule BarJob do
+  use Faktory.Job, client: BarClient
+  def perform(), do: nil
+end
+
+FooJob.perform_async([]) # Enqueues job to Faktory server at foo.faktory.myapp.com
+BarJob.perform_async([]) # Enqueues job to Faktory server at bar.faktory.myapp.com
+```
 
 ## Features
 
