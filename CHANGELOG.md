@@ -3,6 +3,7 @@
 ## 1.0.0
 Detailed info in the linked pull requests.
 
+* --no-start command line option (PR [#62](https://github.com/cjbottaro/faktory_worker_ex/pull/62))
 * Move protocol functions to `Faktory.Client` (PR [#61](https://github.com/cjbottaro/faktory_worker_ex/pull/61))
 * Erlang modules don't expose `__info__/1`. (PR [#58](https://github.com/cjbottaro/faktory_worker_ex/pull/58))
 * Make `Faktory.push/2` a low level API. (PR [#57](https://github.com/cjbottaro/faktory_worker_ex/pull/57))
