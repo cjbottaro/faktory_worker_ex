@@ -23,25 +23,21 @@ defmodule Mix.Tasks.Faktory do
       strict: [concurrency: :integer, queues: :string, pool: :integer, tls: :boolean],
       aliases: [c: :concurrency, q: :queues, p: :pool, t: :tls]
     ) |> case do
-      {options, [], []} -> start(options)
+      {options, [], args} -> start(options, args)
       _ ->
         print_usage()
         exit(:normal)
     end
   end
 
-  defp start(options) do
+  defp start(options, args) do
     # Signify that we want to start the workers.
     Faktory.put_env(:start_workers, true)
 
     # Store our cli options.
     Faktory.put_env(:cli_options, options)
 
-    # Easy enough.
-    Mix.Task.run "app.start"
-
-    # Do the equivalent of --no-halt unless running in IEx.
-    unless IEx.started?, do: Process.sleep(:infinity)
+    Mix.Tasks.Run.run run_args() ++ args
   end
 
   defp print_usage do
@@ -52,6 +48,14 @@ defmodule Mix.Tasks.Faktory do
     -q, --queues       Space seperated list of queues
     -t, --tls          Enable TLS when connecting to Faktory server. Default: disable TLS
     """
+  end
+
+  defp run_args do
+    if iex_running?(), do: [], else: ["--no-halt"]
+  end
+
+  defp iex_running? do
+    Code.ensure_loaded?(IEx) and IEx.started?()
   end
 
 end

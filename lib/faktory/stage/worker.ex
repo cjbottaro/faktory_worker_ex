@@ -2,6 +2,7 @@ defmodule Faktory.Stage.Worker do
   @moduledoc false
 
   use GenStage
+  require Logger
 
   def child_spec({config, index}) do
     %{
@@ -21,7 +22,7 @@ defmodule Faktory.Stage.Worker do
 
   def init(config) do
     Process.flag(:trap_exit, true) # For shutdown grace period, see supervisor.
-    Faktory.Logger.debug "Worker stage #{inspect self()} starting up"
+    Logger.debug "Worker stage #{inspect self()} starting up"
     state = %{config: config, tracker: Faktory.Tracker.name(config)}
     {:consumer, state} # Delay producer subscription until fetcher signals it's ready.
   end
@@ -66,7 +67,7 @@ defmodule Faktory.Stage.Worker do
   end
 
   def terminate(_reason, _state) do
-    Faktory.Logger.debug "Worker stage #{inspect self()} shutting down"
+    Logger.debug "Worker stage #{inspect self()} shutting down"
   end
 
   require Faktory.Utils

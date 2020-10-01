@@ -15,7 +15,7 @@ defmodule Faktory.Middleware do
   defmodule JobTimer do
     use Faktory.Middleware
     import Faktory.Utils, only: [now_in_ms: 0]
-    alias Faktory.Logger
+    require Logger
 
     def call(job, f) do
       # Alter the job by putting a start time in the custom field.

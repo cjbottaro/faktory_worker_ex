@@ -3,7 +3,8 @@ defmodule Faktory.Heartbeat do
 
   use GenServer
 
-  alias Faktory.{Logger, Protocol}
+  alias Faktory.Protocol
+  require Logger
 
   @interval 15_000
 

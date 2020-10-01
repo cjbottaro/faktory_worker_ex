@@ -1,7 +1,7 @@
 defmodule Faktory.Connection do
   @moduledoc false
   use Connection
-  alias Faktory.Logger
+  require Logger
   import Faktory.Utils, only: [if_test: 1]
   import Kernel, except: [send: 2]
 

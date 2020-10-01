@@ -4,6 +4,7 @@ defmodule Faktory.Stage.Fetcher do
   defstruct [:config, :conn, :tracker, :error_count, :quiet]
 
   use GenStage
+  require Logger
 
   def child_spec(config) do
     %{
@@ -22,7 +23,7 @@ defmodule Faktory.Stage.Fetcher do
 
   def init(config) do
     queues = Enum.join(config.queues, ", ")
-    Faktory.Logger.debug "Fetcher stage #{inspect self()} starting up -- #{queues}"
+    Logger.debug "Fetcher stage #{inspect self()} starting up -- #{queues}"
     {:ok, conn} = Faktory.Connection.start_link(config)
 
     state = %__MODULE__{
@@ -65,14 +66,14 @@ defmodule Faktory.Stage.Fetcher do
 
       # Server error. Report and try again, I guess.
       {:ok, {:error, reason}} ->
-        Faktory.Logger.warn("Server error during fetch: #{reason} -- retrying immediately")
+        Logger.warn("Server error during fetch: #{reason} -- retrying immediately")
         send(self(), {:demand, 1})
         {:noreply, [], state}
 
       # Network error. Log, sleep, and try again.
       {:error, reason} ->
         time = Faktory.Utils.exp_backoff(state.error_count)
-        Faktory.Logger.warn("Network error during fetch: #{reason} -- retrying in #{time/1000}s")
+        Logger.warn("Network error during fetch: #{reason} -- retrying in #{time/1000}s")
         Process.send_after(self(), {:demand, 1}, time)
         {:noreply, [], %{state | error_count: state.error_count + 1}}
     end
@@ -84,7 +85,7 @@ defmodule Faktory.Stage.Fetcher do
   end
 
   def handle_call(:quiet, _from, state) do
-    Faktory.Logger.info("Fetcher #{inspect self()} silenced")
+    Logger.info("Fetcher #{inspect self()} silenced")
     {:reply, :ok, [], %{state | quiet: true}}
   end
 

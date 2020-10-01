@@ -7,6 +7,7 @@ defmodule Faktory.Tracker do
   end
 
   use GenServer
+  require Logger
 
   def child_spec(config) do
     %{
@@ -27,7 +28,7 @@ defmodule Faktory.Tracker do
   def init(config) do
     Process.flag(:trap_exit, true)
 
-    Faktory.Logger.debug "Tracker stage #{inspect self()} starting up"
+    Logger.debug "Tracker stage #{inspect self()} starting up"
 
     {:ok, conn} = Faktory.Connection.start_link(config)
 
@@ -76,7 +77,7 @@ defmodule Faktory.Tracker do
     jobtype = job.payload["jobtype"]
     args = job.payload["args"]
 
-    Faktory.Logger.info "#{status} #{inspect worker_pid} jid-#{jid} (#{jobtype}) #{inspect args}"
+    Logger.info "#{status} #{inspect worker_pid} jid-#{jid} (#{jobtype}) #{inspect args}"
 
     {:reply, :ok, put_in(state.jobs[jid], job)}
   end
@@ -91,7 +92,7 @@ defmodule Faktory.Tracker do
 
     retry_until_ok("ACK", fn -> Faktory.Protocol.ack(conn, jid) end)
 
-    Faktory.Logger.info "#{status} #{inspect worker_pid} jid-#{jid} (#{jobtype}) #{time}s"
+    Logger.info "#{status} #{inspect worker_pid} jid-#{jid} (#{jobtype}) #{time}s"
 
     {:reply, :ok, %{state | jobs: jobs}}
   end
@@ -108,10 +109,10 @@ defmodule Faktory.Tracker do
     retry_until_ok("FAIL", fn -> Faktory.Protocol.fail(conn, jid, errtype, message, trace) end)
 
     if time do
-      Faktory.Logger.info "#{status} #{inspect worker_pid} jid-#{jid} (#{jobtype}) #{time}s"
+      Logger.info "#{status} #{inspect worker_pid} jid-#{jid} (#{jobtype}) #{time}s"
     else
       # Job was fetched, but not started.
-      Faktory.Logger.info "#{status} #{inspect worker_pid} jid-#{jid} (#{jobtype})"
+      Logger.info "#{status} #{inspect worker_pid} jid-#{jid} (#{jobtype})"
     end
 
     {:reply, :ok, %{state | jobs: jobs}}
@@ -127,13 +128,13 @@ defmodule Faktory.Tracker do
 
       # Server error. Log and move on.
       {:ok, {:error, reason}}, _count ->
-        Faktory.Logger.warn("Server error on #{cmd}: #{reason} -- moving on")
+        Logger.warn("Server error on #{cmd}: #{reason} -- moving on")
         {:halt, :ok}
 
       # Network error. Log, sleep, and retry.
       {:error, reason}, count ->
         time = Faktory.Utils.exp_backoff(count)
-        Faktory.Logger.warn("Network error on #{cmd}: #{reason} -- retrying in #{time/1000}s")
+        Logger.warn("Network error on #{cmd}: #{reason} -- retrying in #{time/1000}s")
         Process.sleep(time)
         {:cont, count+1}
     end)
@@ -144,7 +145,7 @@ defmodule Faktory.Tracker do
     {_, _, name} = Faktory.Stage.Fetcher.name(state.config)
     case Registry.whereis_name(name) do
       :undefined -> nil # Ok, all good.
-      pid -> Faktory.Logger.warn "Fetcher stage #{inspect pid} still running"
+      pid -> Logger.warn "Fetcher stage #{inspect pid} still running"
     end
 
     # Check that the workers are shutdown.
@@ -152,7 +153,7 @@ defmodule Faktory.Tracker do
       {_, _, name} = Faktory.Stage.Worker.name(state.config, i)
       case Registry.whereis_name(name) do
         :undefined -> nil # Ok, all good.
-        pid -> Faktory.Logger.warn "Worker stage #{inspect pid} still running"
+        pid -> Logger.warn "Worker stage #{inspect pid} still running"
       end
     end
 
