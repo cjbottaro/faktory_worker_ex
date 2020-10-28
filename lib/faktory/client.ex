@@ -232,7 +232,8 @@ defmodule Faktory.Client do
       case result do
         {:ok, _} ->
           %{ "jid" => jid, "args" => args, "jobtype" => jobtype} = job
-          Faktory.Logger.info "Q 📥 #{inspect self()} jid-#{jid} (#{jobtype}) #{inspect(args)}"
+          args = Faktory.Utils.args_to_string(args)
+          Faktory.Logger.info "Q 📥 #{inspect self()} jid-#{jid} (#{jobtype}) #{args}"
           {:ok, job}
 
         error -> error
