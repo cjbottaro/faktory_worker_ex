@@ -121,7 +121,8 @@ defmodule Faktory.Stage.Worker do
   end
 
   def terminate(reason, state) do
-    Faktory.Logger.debug "Worker stage #{inspect self()} shutting down"
+    count = map_size(state.jobs)
+    Faktory.Logger.debug "Worker stage #{inspect self()} shutting down -- #{count} jobs running"
 
     Map.values(state.jobs)
     |> Task.yield_many(state.config.shutdown_grace_period)
