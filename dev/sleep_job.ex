@@ -9,4 +9,9 @@ defmodule Dev.SleepJob do
     end)
     |> Stream.run()
   end
+
+  def perform(time) do
+    Process.sleep(time)
+    IO.puts "done sleeping (#{time})"
+  end
 end

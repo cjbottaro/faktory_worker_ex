@@ -29,7 +29,9 @@ defmodule Faktory.Mixfile do
           "Architecture.md": [title: "Architecture"],
         ],
         main: "readme",
-      ]
+      ],
+
+      xref: [exclude: IEx]
     ]
   end
 
