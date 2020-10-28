@@ -10,8 +10,7 @@ defmodule Faktory.Supervisor do
 
   def init(config) do
     [
-      {Faktory.Heartbeat, config},
-      {Faktory.Tracker, config},
+      {Faktory.Manager, config},
       {Faktory.Stage.Fetcher, config},
       {Faktory.Stage.Worker, config}
     ]

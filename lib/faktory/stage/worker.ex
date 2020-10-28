@@ -32,7 +32,7 @@ defmodule Faktory.Stage.Worker do
 
     state = %{
       config: config,
-      tracker: Faktory.Tracker.name(config),
+      manager: Faktory.Manager.name(config),
       producer: nil,
       jobs: %{},
     }
@@ -44,12 +44,13 @@ defmodule Faktory.Stage.Worker do
     }]}
   end
 
+  # We have to manually manage our demand because
+  # we're creating async tasks to do the actual jobs.
   def handle_subscribe(:producer, _opts, from, state) do
     Enum.each(1..state.config.concurrency, fn _ ->
       :ok = GenStage.ask(from, 1)
     end)
-    state = %{state | producer: from}
-    {:manual, state}
+    {:manual, %{state | producer: from}}
   end
 
   def handle_events([job], _from, state) do
@@ -79,10 +80,8 @@ defmodule Faktory.Stage.Worker do
     case Map.pop(state.jobs, pid) do
       {nil, _jobs} -> {:noreply, [], state}
       {task, jobs} ->
-        :ok = Faktory.Tracker.ack(state.tracker, task.job["jid"])
+        :ok = ack(state, task)
         :ok = GenStage.ask(state.producer, 1)
-        log_ack(task)
-        if_test do: test_results(task.job["jid"])
         {:noreply, [], put_in(state.jobs, jobs)}
     end
   end
@@ -91,21 +90,21 @@ defmodule Faktory.Stage.Worker do
     case Map.pop(state.jobs, pid) do
       {nil, _jobs} -> {:noreply, [], state}
       {task, jobs} ->
-        :ok = Faktory.Tracker.fail(state.tracker, task.job["jid"], reason)
+        :ok = fail(state, task, reason)
         :ok = GenStage.ask(state.producer, 1)
-        log_fail(task)
-        if_test do: test_results(task.job["jid"], reason)
         {:noreply, [], put_in(state.jobs, jobs)}
     end
   end
 
   # If Task.shutdown doesn't return nil, that means that Task finished,
   # so we should be receiving a :EXIT/:DOWN message (or already have).
+  # We don't need to ack or fail it because Faktory will put the job
+  # on retry queue if the reservation expires.
   def handle_info({:reservation_timeout, pid}, state) do
     {task, jobs} = Map.pop(state.jobs, pid)
     if task && Task.shutdown(task, :brutal_kill) == nil do
       log_reservation_expired(task)
-      :ok = GenStage.ask(state.producer, 1)
+      :ok = GenStage.ask(state.producer, 1) # Don't forget this.
     end
     {:noreply, [], put_in(state.jobs, jobs)}
   end
@@ -127,19 +126,26 @@ defmodule Faktory.Stage.Worker do
     Map.values(state.jobs)
     |> Task.yield_many(state.config.shutdown_grace_period)
     |> Enum.each(fn
-      {task, {:ok, _value}} ->
-        :ok = Faktory.Tracker.ack(state.tracker, task.job["jid"])
-        log_ack(task)
-
-      {task, {:exit, reason}} ->
-        :ok = Faktory.Tracker.fail(state.tracker, task.job["jid"], reason)
-        log_fail(task)
-
+      {task, {:ok, _value}} -> ack(state, task)
+      {task, {:exit, error}} -> fail(state, task, error)
       {task, nil} ->
         Task.shutdown(task, :brutal_kill)
-        :ok = Faktory.Tracker.fail(state.tracker, task.job["jid"], reason)
-        log_fail(task)
+        fail(state, task, reason)
     end)
+  end
+
+  def ack(state, task) do
+    :ok = Faktory.Manager.ack(state.manager, task.job["jid"])
+    log_ack(task)
+    if_test do: test_results(task.job["jid"])
+    :ok
+  end
+
+  def fail(state, task, reason) do
+    :ok = Faktory.Manager.fail(state.manager, task.job["jid"], reason)
+    log_fail(task)
+    if_test do: test_results(task.job["jid"], reason)
+    :ok
   end
 
   def log_start(job, worker_pid) do
