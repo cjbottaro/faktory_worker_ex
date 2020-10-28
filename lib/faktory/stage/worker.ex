@@ -5,9 +5,10 @@ defmodule Faktory.Stage.Worker do
   require Logger
   import Faktory.Utils, only: [if_test: 1]
 
-  @start_status "S 🚀"
-  @ack_status   "A 🥂"
-  @fail_status  "F 💥"
+  @start_status   "S 🚀"
+  @ack_status     "A 🥂"
+  @fail_status    "F 💥"
+  @reserve_status "R ⏱"
 
   def child_spec(config) do
     %{
@@ -98,10 +99,12 @@ defmodule Faktory.Stage.Worker do
     end
   end
 
+  # If Task.shutdown doesn't return nil, that means that Task finished,
+  # so we should be receiving a :EXIT/:DOWN message (or already have).
   def handle_info({:reservation_timeout, pid}, state) do
     {task, jobs} = Map.pop(state.jobs, pid)
     if task && Task.shutdown(task, :brutal_kill) == nil do
-      Logger.info("Reservation expired: " <> task.job["jid"])
+      log_reservation_expired(task)
       :ok = GenStage.ask(state.producer, 1)
     end
     {:noreply, [], put_in(state.jobs, jobs)}
@@ -155,6 +158,12 @@ defmodule Faktory.Stage.Worker do
     %{"jid" => jid, "jobtype" => jobtype} = task.job
     time = Faktory.Utils.elapsed(task.start_time)
     Faktory.Logger.info "#{@fail_status} #{inspect self()} jid-#{jid} (#{jobtype}) #{time}s"
+  end
+
+  def log_reservation_expired(task) do
+    %{"jid" => jid, "jobtype" => jobtype} = task.job
+    time = Faktory.Utils.elapsed(task.start_time)
+    Faktory.Logger.info "#{@reserve_status} #{inspect self()} jid-#{jid} (#{jobtype}) #{time}s"
   end
 
   if_test do
