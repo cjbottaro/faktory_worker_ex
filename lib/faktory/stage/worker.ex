@@ -68,16 +68,16 @@ defmodule Faktory.Stage.Worker do
       end)
     end)
 
-    Process.send_after(self(), {:reservation_timeout, task.pid}, job["reserve_for"] * 1000)
+    Process.send_after(self(), {:reservation_timeout, task.ref}, job["reserve_for"] * 1000)
 
     task = Map.merge(task, %{start_time: start_time, job: job})
-    state = update_in(state.jobs, &Map.put(&1, task.pid, task))
+    state = update_in(state.jobs, &Map.put(&1, task.ref, task))
 
     {:noreply, [], state}
   end
 
-  def handle_info({:EXIT, pid, :normal}, state) do
-    case Map.pop(state.jobs, pid) do
+  def handle_info({:DOWN, ref, :process, _pid, :normal}, state) do
+    case Map.pop(state.jobs, ref) do
       {nil, _jobs} -> {:noreply, [], state}
       {task, jobs} ->
         :ok = ack(state, task)
@@ -86,8 +86,8 @@ defmodule Faktory.Stage.Worker do
     end
   end
 
-  def handle_info({:EXIT, pid, reason}, state) do
-    case Map.pop(state.jobs, pid) do
+  def handle_info({:DOWN, ref, :process, _pid, reason}, state) do
+    case Map.pop(state.jobs, ref) do
       {nil, _jobs} -> {:noreply, [], state}
       {task, jobs} ->
         :ok = fail(state, task, reason)
@@ -100,8 +100,8 @@ defmodule Faktory.Stage.Worker do
   # so we should be receiving a :EXIT/:DOWN message (or already have).
   # We don't need to ack or fail it because Faktory will put the job
   # on retry queue if the reservation expires.
-  def handle_info({:reservation_timeout, pid}, state) do
-    {task, jobs} = Map.pop(state.jobs, pid)
+  def handle_info({:reservation_timeout, ref}, state) do
+    {task, jobs} = Map.pop(state.jobs, ref)
     if task && Task.shutdown(task, :brutal_kill) == nil do
       log_reservation_expired(task)
       :ok = GenStage.ask(state.producer, 1) # Don't forget this.
@@ -109,9 +109,9 @@ defmodule Faktory.Stage.Worker do
     {:noreply, [], put_in(state.jobs, jobs)}
   end
 
-  # Task.async both links and monitors, so we can ignore the :DOWN messages from
-  # the monitor because we're already handling the :EXIT messages from the link.
-  def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do
+  # Task.async both links and monitors, so we can ignore the :EXIT messages from
+  # the link because we're already handling the :DOWN messages from the monitor.
+  def handle_info({:EXIT, _pid, _reason}, state) do
     {:noreply, [], state}
   end
 
