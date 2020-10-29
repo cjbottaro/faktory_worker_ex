@@ -129,9 +129,11 @@ defmodule Faktory.Stage.Worker do
     |> Enum.each(fn
       {task, {:ok, _value}} -> ack(state, task)
       {task, {:exit, error}} -> fail(state, task, error)
-      {task, nil} ->
-        Task.shutdown(task, :brutal_kill)
-        fail(state, task, reason)
+      {task, nil} -> case Task.shutdown(task, :brutal_kill) do
+        {:ok, _value} -> ack(state, task)
+        {:exit, error} -> fail(state, task, error)
+        nil -> fail(state, task, reason)
+      end
     end)
   end
 
