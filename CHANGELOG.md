@@ -3,6 +3,8 @@
 ## 1.0.0
 Detailed info in the linked pull requests.
 
+* Graceful shutdown. (PR [#43](https://github.com/cjbottaro/faktory_worker_ex/pull/43), [#56](https://github.com/cjbottaro/faktory_worker_ex/pull/56), [#63](https://github.com/cjbottaro/faktory_worker_ex/pull/63))
+* Internally respect "reserve_for" (PR [#63](https://github.com/cjbottaro/faktory_worker_ex/pull/63))
 * --no-start command line option (PR [#62](https://github.com/cjbottaro/faktory_worker_ex/pull/62))
 * Move protocol functions to `Faktory.Client` (PR [#61](https://github.com/cjbottaro/faktory_worker_ex/pull/61))
 * Erlang modules don't expose `__info__/1`. (PR [#58](https://github.com/cjbottaro/faktory_worker_ex/pull/58))
@@ -12,7 +14,6 @@ Detailed info in the linked pull requests.
 * Find the right job module when jobtype doesn't match module name. (PR [#35](https://github.com/cjbottaro/faktory_worker_ex/pull/35))
 * Implement Redis Serialization Protocol (RESP). (PR [#40](https://github.com/cjbottaro/faktory_worker_ex/pull/40))
 * Handle `quiet` and `terminate` from Faktory server. (PR [#42](https://github.com/cjbottaro/faktory_worker_ex/pull/42))
-* Graceful shutdown. (PR [#43](https://github.com/cjbottaro/faktory_worker_ex/pull/43), [#56](https://github.com/cjbottaro/faktory_worker_ex/pull/56), [#63](https://github.com/cjbottaro/faktory_worker_ex/pull/63))
 * `priority_queues: false`. See module documentation on `Faktory.Worker`. (PR [#44](https://github.com/cjbottaro/faktory_worker_ex/pull/44))
 * Specify job options on `use Faktory.Job`. (PR [#45](https://github.com/cjbottaro/faktory_worker_ex/pull/45))
 * Support for Elixir 1.9 releases. (PR [#46](https://github.com/cjbottaro/faktory_worker_ex/pull/46))

@@ -177,7 +177,7 @@ defmodule Faktory.Stage.Worker do
     Faktory.Logger.info "#{@reserve_status} #{inspect self()} jid-#{jid} (#{jobtype}) #{time}s"
   end
 
-  # Some misbehaved clients do not add reserver_for
+  # Some misbehaved clients do not add a "reserve_for" key in the job.
   @default_reserve_for 1800
   defp reserve_for(job) do
     case job["reserve_for"] do
