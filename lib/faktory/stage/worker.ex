@@ -68,7 +68,7 @@ defmodule Faktory.Stage.Worker do
       end)
     end)
 
-    timer = Process.send_after(self(), {:reservation_timeout, task.ref}, job["reserve_for"] * 1000)
+    timer = Process.send_after(self(), {:reservation_timeout, task.ref}, reserve_for(job) * 1000)
 
     task = Map.merge(task, %{start_time: start_time, job: job, timer: timer})
     state = update_in(state.jobs, &Map.put(&1, task.ref, task))
@@ -175,6 +175,19 @@ defmodule Faktory.Stage.Worker do
     %{"jid" => jid, "jobtype" => jobtype} = task.job
     time = Faktory.Utils.elapsed(task.start_time)
     Faktory.Logger.info "#{@reserve_status} #{inspect self()} jid-#{jid} (#{jobtype}) #{time}s"
+  end
+
+  # Some misbehaved clients do not add reserver_for
+  @default_reserve_for 1800
+  defp reserve_for(job) do
+    case job["reserve_for"] do
+      nil -> @default_reserve_for
+      n when is_integer(n) -> n
+      any ->
+        jid = job["jid"]
+        Faktory.Logger.warn("jid-#{jid} does not have a valid reserve_for: #{inspect any}")
+        @default_reserve_for
+    end
   end
 
   if_test do
