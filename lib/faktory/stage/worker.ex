@@ -68,9 +68,9 @@ defmodule Faktory.Stage.Worker do
       end)
     end)
 
-    Process.send_after(self(), {:reservation_timeout, task.ref}, job["reserve_for"] * 1000)
+    timer = Process.send_after(self(), {:reservation_timeout, task.ref}, job["reserve_for"] * 1000)
 
-    task = Map.merge(task, %{start_time: start_time, job: job})
+    task = Map.merge(task, %{start_time: start_time, job: job, timer: timer})
     state = update_in(state.jobs, &Map.put(&1, task.ref, task))
 
     {:noreply, [], state}
@@ -139,6 +139,7 @@ defmodule Faktory.Stage.Worker do
 
   def ack(state, task) do
     :ok = Faktory.Manager.ack(state.manager, task.job["jid"])
+    Process.cancel_timer(task.timer)
     log_ack(task)
     if_test do: test_results(task.job["jid"])
     :ok
@@ -146,6 +147,7 @@ defmodule Faktory.Stage.Worker do
 
   def fail(state, task, reason) do
     :ok = Faktory.Manager.fail(state.manager, task.job["jid"], reason)
+    Process.cancel_timer(task.timer)
     log_fail(task)
     if_test do: test_results(task.job["jid"], reason)
     :ok
