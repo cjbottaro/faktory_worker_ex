@@ -58,7 +58,8 @@ defmodule Faktory.Job do
     queue: "default",
     retry: 25,
     backtrace: 0,
-    middleware: []
+    middleware: [],
+    reserve_for: 1800
   ]
 
   @doc """

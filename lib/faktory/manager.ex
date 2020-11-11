@@ -1,4 +1,4 @@
-defmodule Faktory.Heartbeat do
+defmodule Faktory.Manager do
   @moduledoc false
 
   use GenServer
@@ -23,9 +23,29 @@ defmodule Faktory.Heartbeat do
   end
 
   def init(config) do
+    Faktory.Logger.debug "Manager #{inspect self()} starting up"
     Process.send_after(self(), :beat, @interval)
     {:ok, conn} = Faktory.Connection.start_link(config)
     {:ok, %{config: config, conn: conn, quiet: false, stop: false}}
+  end
+
+  def ack(server, jid) do
+    GenServer.call(server, {:ack, jid}, :infinity)
+  end
+
+  def fail(server, jid, reason) do
+    GenServer.call(server, {:fail, jid, reason}, :infinity)
+  end
+
+  def handle_call({:ack, jid}, _from, state) do
+    retry_until_ok("ACK", fn -> Faktory.Protocol.ack(state.conn, jid) end)
+    {:reply, :ok, state}
+  end
+
+  def handle_call({:fail, jid, reason}, _from, state) do
+    %{errtype: errtype, message: message, trace: trace} = Faktory.Error.from_reason(reason)
+    retry_until_ok("FAIL", fn -> Faktory.Protocol.fail(state.conn, jid, errtype, message, trace) end)
+    {:reply, :ok, state}
   end
 
   def handle_info(:beat, state) do
@@ -68,6 +88,28 @@ defmodule Faktory.Heartbeat do
   def handle_info(:stop, state) do
     :init.stop()
     {:noreply, %{state | stop: true}}
+  end
+
+  defp retry_until_ok(cmd, f) do
+    Stream.repeatedly(f)
+    |> Enum.reduce_while(0, fn
+
+      # Everything went smoothly.
+      {:ok, "OK"}, _count ->
+        {:halt, :ok}
+
+      # Server error. Log and move on.
+      {:ok, {:error, reason}}, _count ->
+        Faktory.Logger.warn("Server error on #{cmd}: #{reason} -- moving on")
+        {:halt, :ok}
+
+      # Network error. Log, sleep, and retry.
+      {:error, reason}, count ->
+        time = Faktory.Utils.exp_backoff(count)
+        Faktory.Logger.warn("Network error on #{cmd}: #{reason} -- retrying in #{time/1000}s")
+        Process.sleep(time)
+        {:cont, count+1}
+    end)
   end
 
 end

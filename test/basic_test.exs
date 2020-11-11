@@ -1,6 +1,7 @@
 defmodule BasicTest do
   use ExUnit.Case, async: false
 
+  @tag :focus
   test "enqueing and processing a job" do
     {:ok, job} = AddWorker.perform_async([PidMap.register, 1, 2])
     jid = job["jid"]

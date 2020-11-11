@@ -202,7 +202,6 @@ defmodule Faktory.Client do
 
   @doc false
   def push(module, job, options) do
-    require Logger
     import Faktory.Utils, only: [new_jid: 0, if_test: 1, blank?: 1]
     alias Faktory.Middleware
 
@@ -233,7 +232,8 @@ defmodule Faktory.Client do
       case result do
         {:ok, _} ->
           %{ "jid" => jid, "args" => args, "jobtype" => jobtype} = job
-          Logger.info "Q 🕒 #{inspect self()} jid-#{jid} (#{jobtype}) #{inspect(args)}"
+          args = Faktory.Utils.args_to_string(args)
+          Faktory.Logger.info "Q 📥 #{inspect self()} jid-#{jid} (#{jobtype}) #{args}"
           {:ok, job}
 
         error -> error

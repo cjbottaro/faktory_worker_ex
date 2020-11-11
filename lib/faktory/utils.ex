@@ -77,4 +77,8 @@ defmodule Faktory.Utils do
     end
   end
 
+  def args_to_string(args) do
+    inspect(args, binaries: :as_strings, charlists: :as_lists)
+  end
+
 end

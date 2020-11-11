@@ -30,14 +30,7 @@ defmodule Faktory.Stage.Fetcher do
       conn: conn,
       error_count: 0,
       quiet: false,
-      tracker: Faktory.Tracker.name(config)
     }
-
-    # Signal to the workers that they can subscribe.
-    Enum.each (1..config.concurrency), fn i ->
-      worker = Faktory.Stage.Worker.name(config, i)
-      GenServer.cast(worker, :subscribe)
-    end
 
     {:producer, state}
   end
@@ -54,7 +47,6 @@ defmodule Faktory.Stage.Fetcher do
 
       # Job found, send it down the pipeline!
       {:ok, %{} = job} ->
-        :ok = Faktory.Tracker.fetch(state.tracker, job)
         {:noreply, [job], state}
 
       # No job found, manually trigger demand since consumers
