@@ -154,20 +154,7 @@ defmodule Faktory.Worker do
     Faktory.Configuration.call(module, @defaults)
   end
 
-  @doc false
-  def child_spec(module, options) do
-    child_spec(module, options, Faktory.start_workers?)
-  end
-
-  @doc false
-  def child_spec(module, _options, false) do
-    %{
-      id: module,
-      start: {Task, :start_link, [fn -> Process.sleep(:infinity) end]}
-    }
-  end
-
-  def child_spec(module, _options, true) do
+  def child_spec(module, _options) do
     %{
       id: module,
       start: {Faktory.Supervisor, :start_link, [module]},
