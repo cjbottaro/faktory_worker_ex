@@ -1,50 +1,56 @@
 defmodule Faktory.Resp do
   @moduledoc false
 
-  def recv(conn) do
-    with {:ok, line} <- Faktory.Connection.recv(conn, :line) do
-      parse_resp(line, conn)
+  alias Faktory.Socket
+
+  def recv(socket) do
+    with {:ok, line} <- Socket.recv(socket, :line) do
+      parse_line(line, socket)
     end
   end
 
-  defp parse_resp(line, conn) when is_binary(line) do
-    case line do
-      <<"+", line::binary>> -> parse_resp(:simple_string, line)
-      <<"-", line::binary>> -> parse_resp(:error, line)
-      <<":", line::binary>> -> parse_resp(:integer, line)
-      <<"$", line::binary>> -> parse_resp(:bulk_string, line, conn)
+  defp parse_line(line, socket) do
+    case String.trim_trailing(line) do
+      <<"+", line::binary>> -> parse(:simple_string, line)
+      <<"-", line::binary>> -> parse(:error, line)
+      <<":", line::binary>> -> parse(:integer, line)
+      <<"$", line::binary>> -> parse(:bulk_string, line, socket)
       <<"*", line::binary>> -> raise(ArgumentError, message: "RESP arrays not implemented: #{line}")
     end
   end
 
-  defp parse_resp(:simple_string, line) do
+  defp parse(:simple_string, line) do
     {:ok, line}
   end
 
-  defp parse_resp(:error, line) do
+  defp parse(:error, line) do
     {:ok, {:error, line}}
   end
 
-  defp parse_resp(:integer, line) do
+  defp parse(:integer, line) do
     {:ok, String.to_integer(line)}
   end
 
   # (empty string) "$0\r\n\r\n" -> {:ok, ""}
-  defp parse_resp(:bulk_string, "0", conn) do
-    Faktory.Connection.recv(conn, :line)
+  defp parse(:bulk_string, "0", socket) do
+    case Socket.recv(socket, :line) do
+      {:ok, "\r\n"} -> {:ok, ""}
+      error -> error
+    end
   end
 
   # (null) "$-1\r\n" -> {:ok, nil}
-  defp parse_resp(:bulk_string, "-1", _conn) do
+  defp parse(:bulk_string, "-1", _conn) do
     {:ok, nil}
   end
 
   # (bulk string) "$6\r\nfoobar\r\n" -> {:ok, "foobar"}
-  defp parse_resp(:bulk_string, line, conn) do
-    size = String.to_integer(line) + 2 # Don't forget the \r\n
-    case Faktory.Connection.recv(conn, size) do
-      {:ok, bulk} -> {:ok, String.replace_suffix(bulk, "\r\n", "")}
-      error -> error
+  defp parse(:bulk_string, line, socket) do
+    size = String.to_integer(line)
+    with {:ok, bulk} <- Socket.recv(socket, size),
+      {:ok, "\r\n"} <- Socket.recv(socket, :line)
+    do
+      {:ok, bulk}
     end
   end
 
