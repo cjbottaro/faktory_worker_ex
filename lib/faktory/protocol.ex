@@ -41,8 +41,34 @@ defmodule Faktory.Protocol do
   end
 
   def push(job) do
-    payload = Jason.encode!(job)
-    ["PUSH", " ", payload, "\r\n"]
+    ["PUSH", " ", Jason.encode!(job), "\r\n"]
+  end
+
+  def fetch(queues) do
+    ["FETCH", " ", queues, "\r\n"]
+  end
+
+  def ack(jid) do
+    ["ACK", " ", Jason.encode!(%{jid: jid}), "\r\n"]
+  end
+
+  def beat(wid) do
+    ["BEAT", " ", Jason.encode!(%{wid: wid}), "\r\n"]
+  end
+
+  def flush do
+    ["FLUSH", "\r\n"]
+  end
+
+  def fail(jid, errtype, message, backtrace) do
+    payload = %{
+      jid: jid,
+      errtype: errtype,
+      message: message,
+      backtrace: backtrace
+    } |> Jason.encode!
+
+    ["FAIL", " ", payload, "\r\n"]
   end
 
   def handshake(conn, hello) do

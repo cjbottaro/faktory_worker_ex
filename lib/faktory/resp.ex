@@ -5,11 +5,11 @@ defmodule Faktory.Resp do
 
   def recv(socket) do
     with {:ok, line} <- Socket.recv(socket, :line) do
-      parse_line(line, socket)
+      parse(line, socket)
     end
   end
 
-  defp parse_line(line, socket) do
+  def parse(line, socket) when is_binary(line) do
     case String.trim_trailing(line) do
       <<"+", line::binary>> -> parse(:simple_string, line)
       <<"-", line::binary>> -> parse(:error, line)
@@ -19,20 +19,20 @@ defmodule Faktory.Resp do
     end
   end
 
-  defp parse(:simple_string, line) do
+  def parse(:simple_string, line) do
     {:ok, line}
   end
 
-  defp parse(:error, line) do
+  def parse(:error, line) do
     {:ok, {:error, line}}
   end
 
-  defp parse(:integer, line) do
+  def parse(:integer, line) do
     {:ok, String.to_integer(line)}
   end
 
   # (empty string) "$0\r\n\r\n" -> {:ok, ""}
-  defp parse(:bulk_string, "0", socket) do
+  def parse(:bulk_string, "0", socket) do
     case Socket.recv(socket, :line) do
       {:ok, "\r\n"} -> {:ok, ""}
       error -> error
@@ -40,12 +40,12 @@ defmodule Faktory.Resp do
   end
 
   # (null) "$-1\r\n" -> {:ok, nil}
-  defp parse(:bulk_string, "-1", _conn) do
+  def parse(:bulk_string, "-1", _conn) do
     {:ok, nil}
   end
 
   # (bulk string) "$6\r\nfoobar\r\n" -> {:ok, "foobar"}
-  defp parse(:bulk_string, line, socket) do
+  def parse(:bulk_string, line, socket) do
     size = String.to_integer(line)
     with {:ok, bulk} <- Socket.recv(socket, size),
       {:ok, "\r\n"} <- Socket.recv(socket, :line)
