@@ -1,9 +1,87 @@
 defmodule Faktory.Client do
+  @not_connected "not_connected"
+
+  @moduledoc """
+  Low level client connection to a Faktory server.
+
+  You shouldn't really need to use this directly, but it can useful for raw
+  pushes, getting server info, and using the mutate API.
+
+  ## Quickstart
+  ```
+  {ok, client} = Faktory.Client.start_link()
+  {:ok, info} = Faktory.Client.info(client)
+  {:ok, job} = Faktory.Client.push(client, jobtype: "Some::Ruby::Class", args: [1, 2])
+  ```
+
+  ## Features
+
+  This module uses the awesome `Connection` library in addition to "active"
+  socket connections. This means that connections are _proactively_ reconnected
+  on disconnection, even if they are completely idle. This is in contrast to
+  passive connections that require some kind of usage to detect a disconnection.
+
+  You can see this in action by making a connection to the Faktory server, then
+  restarting the server.
+  ```
+  {:ok, conn} = Faktory.Client.start_link()
+
+  15:04:31.727 [debug] Connection established to localhost:7419 in 43ms
+
+  {:ok, #PID<0.231.0>}
+
+  # Restart Faktory server
+
+  15:04:40.689 [warn]  Disconnected from localhost:7419 (tcp_closed)
+
+  15:04:40.693 [warn]  Connection failed to localhost:7419 (closed), down for 4ms
+
+  15:04:41.695 [warn]  Connection failed to localhost:7419 (econnrefused), down for 1006ms
+
+  15:04:42.696 [warn]  Connection failed to localhost:7419 (econnrefused), down for 2007ms
+
+  {:error, #{inspect @not_connected}} = Faktory.Client.info(conn)
+
+  15:04:43.698 [warn]  Connection failed to localhost:7419 (econnrefused), down for 3009ms
+
+  15:04:44.699 [warn]  Connection failed to localhost:7419 (econnrefused), down for 4010ms
+
+  15:04:45.700 [warn]  Connection failed to localhost:7419 (econnrefused), down for 5011ms
+
+  15:04:46.701 [warn]  Connection failed to localhost:7419 (econnrefused), down for 6012ms
+
+  15:04:47.714 [info]  Connection reestablished to localhost:7419 in 7026ms
+
+  {:ok, info} = Faktory.Client.info(conn)
+  ```
+
+  ## Caveats
+
+  The Faktory server answers requests in the order it receives them. This means if you
+  share a single `Faktory.Client` connection between several processes, responses are
+  serialized. This is very evident if you call `fetch/2` which can take up to 2 seconds
+  to get a response.
+  ```
+  {ok, conn} = Faktory.Client.start_link()
+  Task.start(fn -> Faktory.Client.fetch(conn, "foobar") |> IO.inspect() end)
+  Process.sleep(10)
+  Faktory.Client.info(conn)
+
+  15:17:42.549 [debug] fetch executed in 2038ms
+  {:ok, nil}
+
+  15:17:42.560 [debug] info executed in 2038ms
+  {:ok, ...}
+  ```
+
+  In other words, the `info/1` call had to wait for the `fetch/2` to finish.
+
+  Consider using `Faktory.Client.Pool` to get around this problem.
+  """
+
   use Connection
   require Logger
   alias Faktory.{Socket, Protocol, Resp}
-
-  @not_connected "not_connected"
 
   def info(client) do
     case Connection.call(client, :info) do
@@ -53,6 +131,11 @@ defmodule Faktory.Client do
     end
   end
 
+  @doc false
+  def crash(client) do
+    Connection.cast(client, :crash)
+  end
+
   @defaults [
     host: "localhost",
     port: 7419,
@@ -60,6 +143,7 @@ defmodule Faktory.Client do
     tls: false,
     wid: nil,
   ]
+
 
   def defaults do
     defaults = Application.get_application(__MODULE__)
@@ -211,6 +295,10 @@ defmodule Faktory.Client do
   def handle_call(:flush, from, state) do
     Socket.send(state.socket, Protocol.flush())
     {:noreply, push_call(from, :flush, state)}
+  end
+
+  def handle_cast(:crash, _state) do
+    raise "crash"
   end
 
   defp push_call(from, name, state) do
