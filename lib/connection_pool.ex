@@ -3,7 +3,7 @@ defmodule ConnectionPool do
 
   @defaults [
     size: 10,
-    timeout: :infinity,
+    timeout: 5_000,
   ]
 
   def defaults, do: @defaults
@@ -84,7 +84,7 @@ defmodule ConnectionPool do
       checked_in: names,
       checked_out: %{},
       started: MapSet.new(),
-      waiting: :queue.new(),
+      waiting: :ordsets.new(),
     }
 
     {:ok, state}
@@ -124,8 +124,16 @@ defmodule ConnectionPool do
   end
 
   def handle_info({:checkout_timeout, from}, state) do
+    %{waiting: waiting} = state
+
+    # Sorry you got timed out.
     :ok = GenServer.reply(from, {:error, :timeout})
-    {:noreply, state}
+
+    # Proactively remove them from the waiters. Not sure how to do this the most
+    # efficiently.
+    waiting = Enum.reject(waiting, fn {_time, waiter, _timer} -> waiter == from end)
+
+    {:noreply, %{state | waiting: waiting}}
   end
 
   def handle_info({:DOWN, _ref, :process, pid, _reason}, state) do
@@ -188,22 +196,22 @@ defmodule ConnectionPool do
       n -> Process.send_after(self(), {:checkout_timeout, from}, n)
     end
 
-    waiting = :queue.in({from, timer}, waiting)
+    waiting = :ordsets.add_element({monotonic_time(), from, timer}, waiting)
 
     %{state | waiting: waiting}
   end
 
   defp reply_to_waiter(name, state) do
-    reply_to_waiter(name, :queue.out(state.waiting), state)
+    reply_to_waiter(name, state.waiting, state)
   end
 
   # No waiters, or all our waiters already timed out.
-  defp reply_to_waiter(_name, {:empty, waiting}, state) do
-    %{state | waiting: waiting}
+  defp reply_to_waiter(_name, [], state) do
+    %{state | waiting: :ordsets.new()}
   end
 
   # The waiter specified timeout: :inifinity, thus they have no timer.
-  defp reply_to_waiter(name, {{:value, {from, nil}}, waiting}, state) do
+  defp reply_to_waiter(name, [{_time, from, nil} | waiting], state) do
     {pid, _ref} = from
     {^name, state} = check_out(pid, state)
     :ok = GenServer.reply(from, {:ok, name})
@@ -211,7 +219,7 @@ defmodule ConnectionPool do
   end
 
   # Waiter has a timer, but it might have expired already.
-  defp reply_to_waiter(name, {{:value, {from, timer}}, waiting}, state) do
+  defp reply_to_waiter(name, [{_time, from, timer} | waiting], state) do
     case Process.cancel_timer(timer) do
       n when is_integer(n) ->
         {pid, _ref} = from
@@ -219,8 +227,12 @@ defmodule ConnectionPool do
         :ok = GenServer.reply(from, {:ok, name})
         %{state | waiting: waiting}
 
-      false -> reply_to_waiter(name, :queue.out(waiting), state)
+      false -> reply_to_waiter(name, waiting, state)
     end
+  end
+
+  defp monotonic_time do
+    System.monotonic_time(:microsecond)
   end
 
 end
