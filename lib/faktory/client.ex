@@ -99,6 +99,7 @@ defmodule Faktory.Client do
       def push(job, options \\ []), do: Faktory.Client.push(__MODULE__, job, options)
       def info(), do: Faktory.Client.info(__MODULE__)
       def flush(), do: Faktory.Client.flush(__MODULE__)
+      def mutate(mutation), do: Faktory.Client.mutate(__MODULE__, mutation)
 
     end
   end
@@ -172,6 +173,13 @@ defmodule Faktory.Client do
   All job info will be lost.
   """
   @callback flush :: :ok | {:error, binary}
+
+  @doc """
+  Mutate API.
+
+  https://github.com/contribsys/faktory/wiki/Mutate-API
+  """
+  @callback mutate(mutation :: map) :: :ok | {:error, binary}
 
   @doc false
   def config(module) do
@@ -247,6 +255,11 @@ defmodule Faktory.Client do
 
   def flush(module) do
     :poolboy.transaction(module, &Protocol.flush(&1))
+  end
+
+  def mutate(module, mutation) do
+    mutation = Jason.encode!(mutation)
+    :poolboy.transaction(module, &Protocol.mutate(&1, mutation))
   end
 
 end

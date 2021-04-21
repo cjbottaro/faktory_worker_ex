@@ -51,4 +51,25 @@ defmodule BasicTest do
     assert CustomClientJob.faktory_options[:client] == CustomClient
   end
 
+  test "mutate scheduled -> dead" do
+    {:ok, info} = Test.Client.info()
+    assert info["faktory"]["tasks"]["Scheduled"]["size"] == 0
+    assert info["faktory"]["tasks"]["Dead"]["size"] == 0
+
+    at = DateTime.utc_now()
+    |> DateTime.add(60)
+
+    {:ok, _job} = AddWorker.perform_async([PidMap.register, 1, 2], at: at)
+
+    {:ok, info} = Test.Client.info()
+    assert info["faktory"]["tasks"]["Scheduled"]["size"] == 1
+    assert info["faktory"]["tasks"]["Dead"]["size"] == 0
+
+    :ok = Test.Client.mutate(%{cmd: "kill", target: "scheduled", filter: %{jobtype: "AddWorker"}})
+
+    {:ok, info} = Test.Client.info()
+    assert info["faktory"]["tasks"]["Scheduled"]["size"] == 0
+    assert info["faktory"]["tasks"]["Dead"]["size"] == 1
+  end
+
 end

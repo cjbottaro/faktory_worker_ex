@@ -115,4 +115,11 @@ defmodule Faktory.Protocol do
     end
   end
 
+  def mutate(conn, mutation) do
+    with :ok <- Connection.send(conn, "MUTATE #{mutation}"),
+      {:ok, "OK"} <- Resp.recv(conn) do
+        :ok
+    end
+  end
+
 end
