@@ -172,21 +172,6 @@ defmodule Faktory.Job do
     end
   end
 
-  @type job :: %{
-    required(:jid) => binary,
-    required(:jobtype) => binary,
-    required(:args) => [term],
-    required(:queue) => binary,
-    optional(:reserve_for) => non_neg_integer(),
-    optional(:at) => binary,
-    optional(:retry) => non_neg_integer(),
-    optional(:backtrace) => non_neg_integer(),
-    optional(:created_at) => binary,
-    optional(:enqueued_at) => binary,
-    optional(:failure) => map,
-    optional(:custom) => map
-  }
-
   @doc """
   Specific job configuration.
 
@@ -205,7 +190,7 @@ defmodule Faktory.Job do
   MyJob.perform_async(job_args, queue: "not_default" jobtype: "Worker::MyJob")
   ```
   """
-  @callback perform_async(args :: [term], options :: Keyword.t) :: {:ok, job} | {:error, reason :: term}
+  @callback perform_async(args :: [term], options :: Keyword.t) :: {:ok, Faktory.job} | {:error, reason :: term}
 
   @doc false
   def perform_async(args, options) do
@@ -213,7 +198,7 @@ defmodule Faktory.Job do
       {nil, _options} -> {:error, ":client is required"}
       {client, options} ->
         job = Keyword.put(options, :args, args) |> new()
-        client.push(job, options)
+        Faktory.Client.push(client, job, options)
     end
   end
 

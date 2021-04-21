@@ -13,13 +13,23 @@ defmodule Faktory do
     %{binary => json}
   )
 
-  # A Faktory job.
   @type job :: %{
-    required(binary) => json
+    required(:jid) => binary,
+    required(:jobtype) => binary,
+    required(:args) => [term],
+    required(:queue) => binary,
+    optional(:reserve_for) => non_neg_integer(),
+    optional(:at) => binary,
+    optional(:retry) => non_neg_integer(),
+    optional(:backtrace) => non_neg_integer(),
+    optional(:created_at) => binary,
+    optional(:enqueued_at) => binary,
+    optional(:failure) => map,
+    optional(:custom) => map
   }
 
   # A connection to the Faktory server.
-  @type conn :: pid
+  @type conn :: GenServer.server()
 
   def get_env(key, default \\ nil) do
     Application.get_env(:faktory_worker_ex, key, default)

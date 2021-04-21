@@ -1,4 +1,16 @@
-# defmodule Dev.Client do
-#   @moduledoc false
-#   use Faktory.Client, otp_app: :faktory_worker_ex
-# end
+defmodule Dev.Pool do
+  @moduledoc false
+
+  use ConnectionPool, size: 2
+
+  def start_spec(name) do
+    {
+      Faktory.Client,
+      :start_link,
+      [
+        [],
+        [name: name]
+      ]
+    }
+  end
+end
