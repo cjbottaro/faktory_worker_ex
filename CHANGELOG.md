@@ -3,7 +3,7 @@
 ## 1.0.0
 Detailed info in the linked pull requests.
 
-* Add mutate API support. (PR [#64](https://github.com/cjbottaro/faktory_worker_ex/pull/64))
+* Add mutate API support. (PR [#67](https://github.com/cjbottaro/faktory_worker_ex/pull/67))
 * Granular control over starting workers. (PR [#64](https://github.com/cjbottaro/faktory_worker_ex/pull/64))
 * Graceful shutdown. (PR [#43](https://github.com/cjbottaro/faktory_worker_ex/pull/43), [#56](https://github.com/cjbottaro/faktory_worker_ex/pull/56), [#63](https://github.com/cjbottaro/faktory_worker_ex/pull/63))
 * Internally respect "reserve_for" (PR [#63](https://github.com/cjbottaro/faktory_worker_ex/pull/63))
