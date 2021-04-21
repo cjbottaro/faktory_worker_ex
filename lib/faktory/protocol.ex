@@ -17,6 +17,60 @@ defmodule Faktory.Protocol do
 
   alias Faktory.{Utils, Connection, Resp}
 
+  def hello(_greeting, _config) do
+    # %{
+    #   password: state.password,
+    #   hostname: Utils.hostname,
+    #   pid: Utils.unix_pid,
+    #   labels: ["elixir"],
+    #   v: 2,
+    # }
+
+    payload = %{
+      hostname: Utils.hostname(),
+      pid: Utils.unix_pid(),
+      labels: ["elixir"],
+      v: 2
+    } |> Jason.encode!()
+
+    ["HELLO", " ", payload, "\r\n"]
+  end
+
+  def info do
+    ["INFO", "\r\n"]
+  end
+
+  def push(job) do
+    ["PUSH", " ", Jason.encode!(job), "\r\n"]
+  end
+
+  def fetch(queues) do
+    ["FETCH", " ", queues, "\r\n"]
+  end
+
+  def ack(jid) do
+    ["ACK", " ", Jason.encode!(%{jid: jid}), "\r\n"]
+  end
+
+  def beat(wid) do
+    ["BEAT", " ", Jason.encode!(%{wid: wid}), "\r\n"]
+  end
+
+  def flush do
+    ["FLUSH", "\r\n"]
+  end
+
+  def fail(jid, errtype, message, backtrace) do
+    payload = %{
+      jid: jid,
+      errtype: errtype,
+      message: message,
+      backtrace: backtrace
+    } |> Jason.encode!
+
+    ["FAIL", " ", payload, "\r\n"]
+  end
+
   def handshake(conn, hello) do
     with \
       {:ok, <<"HI", json::binary>>} <- Resp.recv(conn),
@@ -39,18 +93,6 @@ defmodule Faktory.Protocol do
     end
     |> Map.delete(:password)
     |> Jason.encode(hello)
-  end
-
-  @spec push(conn, job) :: success | network_error | server_error
-
-  def push(conn, job) when is_list(job), do: push(conn, Map.new(job))
-
-  def push(conn, job) do
-    payload = Jason.encode!(job)
-
-    with :ok <- Connection.send(conn, "PUSH #{payload}") do
-      Resp.recv(conn)
-    end
   end
 
   def fetch(conn, queues) when is_list(queues) do

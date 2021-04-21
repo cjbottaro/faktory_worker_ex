@@ -49,8 +49,8 @@ defmodule Faktory.Mixfile do
       {:connection, "~> 1.0"},
       {:jason, "~> 1.1"},
       {:poolboy, "~> 1.5"},
-      {:socket, "~> 0.3"},
       {:gen_stage, "~> 1.0"},
+      {:telemetry, "~> 0.4"},
       {:ex_doc, "~> 0.19", only: :dev},
       {:mox, "~> 0.3", only: :test},
     ]

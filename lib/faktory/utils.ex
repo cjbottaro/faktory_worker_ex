@@ -81,4 +81,19 @@ defmodule Faktory.Utils do
     inspect(args, binaries: :as_strings, charlists: :as_lists)
   end
 
+  def format_duration(usec) do
+    cond do
+      usec < 1_000 ->
+        "#{usec}μs"
+
+      usec < 10_000_000 ->
+        ms = usec / 1_000 |> round()
+        "#{ms}ms"
+
+      true ->
+        s = usec / 1_000_000 |> round()
+        "#{s}s"
+    end
+  end
+
 end

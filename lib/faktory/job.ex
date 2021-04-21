@@ -2,7 +2,7 @@ defmodule Faktory.Job do
   @moduledoc """
   Use this module to create your job processors.
 
-  ### Getting started
+  ## Getting started
 
   All that is required is to define a `perform` function that takes zero or more
   arguments.
@@ -17,148 +17,204 @@ defmodule Faktory.Job do
   end
 
   # To enqueue jobs of this type.
-  MyFunkyJob.perform_async([1, "foo"])
+  {:ok, client} = Faktory.Client.start_link()
+  MyFunkyJob.perform_async([1, "foo"], client: client)
   ```
 
-  **IMPORTANT**: `perform_async` takes a list who's size must match exactly the airty of
-  `perform`.
+  **IMPORTANT**
+  > The first argument to `c:perform_async/2` must be a list of
+  > size exactly equal to the arity of your `perform` function.
 
-  ### Configuring
+  ## Client
 
-  You can configure various aspects of the job by passing a keyword list to
-  `use Faktory.Job` or `faktory_options/1`. They are both functionally the
-  same and it's mostly an issue of style.
+  In order to enqueue a job via `c:perform_async/2`, we need a client connection
+  to the Faktory server.
 
-  ```elixir
+  Consider starting a named `Faktory.Client` (preferably in a supervision tree).
+  ```
+  {:ok, conn} = Faktory.Client.start_link([host: "foo.bar.com"], name: MyFaktoryClient)
+  ```
+
+  Now tell your job to use that client connection.
+  ```
   defmodule MyFunkyJob do
-    use Faktory.Job, queue: "default", retry: 25, backtrace: 0
+    use Faktory.Job, client: MyFaktoryClient
+
+    def perform(n1, n2), do: nil
   end
 
-  # These are equivalent.
+  MyFunkJob.perform_async([1, 2])
+  ```
+
+  See the configuration section below for how to set a global default client.
+
+  ## Configuration
+
+  You can set global configuration that affects all modules via `Config`.
+  ```
+  config :faktory_worker_ex, Faktory.Job,
+    queue: "not-default",
+    client: MyFaktoryClient
 
   defmodule MyFunkyJob do
     use Faktory.Job
-    faktory_options queue: "default", retry: 25, backtrace: 0
+  end
+
+  "not-default" = MyFunkyJob.config[:queue]
+  MyFaktoryClient = MyFunkyJob.config[:client]
+  ```
+
+  You can set job specific configuration at compile time.
+  ```
+  defmodule MyFunkyJob do
+    use Faktory.Job, queue: "funky-queue", client: MyFaktoryClient
   end
   ```
 
-  See `c:faktory_options/0` for available options and defaults.
-
-  ### Runtime overrides
-
-  You can override `faktory_options` when enqueuing a job.
-
-  ```elixir
-  MyFunkyJob.perform_async([1, "foo"], queue: "not_default")
-  MyFunkyJob.perform_async([2, "bar"], retry: 0)
+  Or via `Config`, which allows for run time config via `config/runtime.exs`.
   ```
+  config :your_application, MyFunkyJob,
+    queue: "funky-queue",
+    client: MyFaktoryClient
+  ```
+
+  Config via `Config` takes precedence over compile time config, and job
+  specific config take precedence over the global `Faktory.Job` config. Finally,
+  function call arguments take precedence over config. All config and function
+  arguments are merged together.
   """
 
   @defaults [
     queue: "default",
-    retry: 25,
-    backtrace: 0,
     middleware: [],
-    reserve_for: 1800
   ]
 
   @doc """
-  Returns the default job configuration.
+  Default job configuration.
 
   ```elixir
-  iex(1)> Faktory.Job.defaults
-  #{inspect @defaults}
+  iex(1)> Faktory.Job.defaults()
+  #{inspect @defaults, pretty: true, width: 0}
   ```
   """
   def defaults do
     @defaults
   end
 
-  defmacro __using__(options) do
-    quote do
-      @behaviour Faktory.Job
-      import Faktory.Job, only: [faktory_options: 1]
-      @faktory_options Keyword.merge(Faktory.Job.defaults, jobtype: inspect(__MODULE__))
-      @before_compile Faktory.Job
-
-      faktory_options(unquote(options))
-
-      def perform_async(args, options \\ []) do
-        Faktory.Job.perform_async(@faktory_options, args, options)
-      end
-
-    end
-  end
-
-  defmacro __before_compile__(_env) do
-    quote do
-      def faktory_options do
-        @faktory_options
-      end
-    end
-  end
-
-  @type job :: map
-
   @doc """
-  Returns the default options for a given job module.
+  Global job configuration.
 
+  This overrides the `defaults/1` with configuration specified via `Config`.
   ```
-  iex(5)> MyFunkyJob.faktory_options
-  [
-    queue: "default",
-    jobtype: "MyFunkyJob",
-    retry: 25,
-    middleware: [],
-    backtrace: 10,
-    client: nil
-  ]
+  config :faktory_worker_ex, Faktory.Job, queue: "not-default"
+
+  iex(1)> Faktory.Job.defaults()
+  #{inspect @defaults, pretty: true, width: 0}
+
+  iex(2)> Faktory.Job.config()
+  #{inspect Keyword.merge(@defaults, queue: "not-default"), pretty: true, width: 0}
   ```
   """
-  @callback faktory_options() :: options :: Keyword.t
+  def config do
+    config = Application.get_application(__MODULE__)
+    |> Application.get_env(__MODULE__, [])
+
+    Keyword.merge(@defaults, config)
+  end
+
+  @doc false
+  def new(fields)
+
+  def new(fields) when is_list(fields) or is_map(fields) do
+    Map.new(fields, fn
+      {k, v} when is_atom(k) -> {k, v}
+      {k, v} when is_binary(k) -> {String.to_atom(k), v}
+    end)
+    |> Map.take([
+      :jid,
+      :jobtype,
+      :args,
+      :queue,
+      :reserve_for,
+      :at,
+      :retry,
+      :backtrace,
+      :created_at,
+      :enqueued_at,
+      :failure,
+      :custom
+    ])
+  end
+
+  def new(fields) when is_binary(fields) do
+    Jason.decode!(fields) |> new()
+  end
+
+  defmacro __using__(config \\ []) do
+    quote location: :keep do
+      @behaviour Faktory.Job
+      @config unquote(config)
+
+      def config do
+        config = Application.get_application(__MODULE__)
+        |> Application.get_env(__MODULE__, [])
+
+        Faktory.Job.config()
+        |> Keyword.merge(@config)
+        |> Keyword.merge(config)
+      end
+
+      def perform_async(args, options \\ []) do
+        options = Keyword.merge(config(), options)
+        Faktory.Job.perform_async(args, options)
+      end
+
+    end
+  end
+
+  @type job :: %{
+    required(:jid) => binary,
+    required(:jobtype) => binary,
+    required(:args) => [term],
+    required(:queue) => binary,
+    optional(:reserve_for) => non_neg_integer(),
+    optional(:at) => binary,
+    optional(:retry) => non_neg_integer(),
+    optional(:backtrace) => non_neg_integer(),
+    optional(:created_at) => binary,
+    optional(:enqueued_at) => binary,
+    optional(:failure) => map,
+    optional(:custom) => map
+  }
+
+  @doc """
+  Specific job configuration.
+
+  Returns the configuration for this specific job taking into consideration
+  global configuration, compile time configuration, and run time configuration.
+  """
+  @callback config() :: Keyword.t
 
   @doc """
   Enqueue a job.
 
-  `options` can override any options specified by `faktory_options/1`.
-
-  For all valid options, see `c:faktory_options/0`.
-
+  `options` can override any configuration in `c:config/0`.
   ```
   job_args = [123, "abc"]
   MyJob.perform_async(job_args)
   MyJob.perform_async(job_args, queue: "not_default" jobtype: "Worker::MyJob")
   ```
   """
-  @callback perform_async(args :: [any], options :: Keyword.t | []) :: {:ok, job} | {:error, reason :: binary}
+  @callback perform_async(args :: [term], options :: Keyword.t) :: {:ok, job} | {:error, reason :: term}
 
-  @doc """
-  Set default options for all jobs of this type.
-
-  For all valid options and their defaults, see `c:faktory_options/0`.
-  """
-  @spec faktory_options(Keyword.t) :: term
-  defmacro faktory_options(options) do
-    quote do
-      options = unquote(options)
-      @faktory_options Keyword.merge(@faktory_options, options)
+  @doc false
+  def perform_async(args, options) do
+    case Keyword.pop(options, :client) do
+      {nil, _options} -> {:error, ":client is required"}
+      {client, options} ->
+        job = Keyword.put(options, :args, args) |> new()
+        client.push(job, options)
     end
-  end
-
-  def perform_async(faktory_options, args, options) do
-    options = Keyword.merge(faktory_options, options)
-    job = %{
-      "jobtype" => options[:jobtype],
-      "args" => args,
-      "queue" => options[:queue],
-      "reserve_for" => options[:reserve_for],
-      "at" => options[:at],
-      "retry" => options[:retry],
-      "backtrace" => options[:backtrace]
-    }
-
-    client = options[:client] || Faktory.default_client() || raise("No default client configured")
-    client.push(job, options)
   end
 
 end
