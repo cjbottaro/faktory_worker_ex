@@ -190,7 +190,7 @@ defmodule Faktory.Job do
   MyJob.perform_async(job_args, queue: "not_default" jobtype: "Worker::MyJob")
   ```
   """
-  @callback perform_async(args :: [term], options :: Keyword.t) :: {:ok, Faktory.job} | {:error, reason :: term}
+  @callback perform_async(args :: [term], options :: Keyword.t) :: {:ok, Faktory.push_job} | {:error, reason :: term}
 
   @doc false
   def perform_async(args, options) do

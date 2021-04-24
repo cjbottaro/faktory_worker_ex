@@ -3,8 +3,6 @@ defmodule Faktory.Manager do
 
   use GenServer
 
-  alias Faktory.{Logger, Protocol}
-
   @interval 15_000
 
   def child_spec(config) do
@@ -38,45 +36,45 @@ defmodule Faktory.Manager do
   end
 
   def handle_call({:ack, jid}, _from, state) do
-    retry_until_ok("ACK", fn -> Faktory.Protocol.ack(state.conn, jid) end)
+    retry_until_ok("ACK", fn -> Faktory.Connection.ack(state.conn, jid) end)
     {:reply, :ok, state}
   end
 
   def handle_call({:fail, jid, reason}, _from, state) do
     %{errtype: errtype, message: message, trace: trace} = Faktory.Error.from_reason(reason)
-    retry_until_ok("FAIL", fn -> Faktory.Protocol.fail(state.conn, jid, errtype, message, trace) end)
+    retry_until_ok("FAIL", fn -> Faktory.Connection.fail(state.conn, jid, errtype, message, trace) end)
     {:reply, :ok, state}
   end
 
-  def handle_info(:beat, state) do
-    wid = state.config.wid
-    conn = state.conn
+  # def handle_info(:beat, state) do
+  #   wid = state.config.wid
+  #   conn = state.conn
 
-    case Protocol.beat(conn, wid) do
-      {:ok, signal} when is_map(signal) ->
-        Logger.debug("wid-#{wid} Heartbeat #{inspect signal}")
-        Process.send_after(self(), :beat, @interval)
-        case signal do
-          %{"state" => "quiet"} -> send(self(), :quiet)
-          %{"state" => "terminate"} -> send(self(), :stop)
-        end
+  #   case Faktory.Connection.beat(conn) do
+  #     {:ok, signal} when is_map(signal) ->
+  #       Logger.debug("wid-#{wid} Heartbeat #{inspect signal}")
+  #       Process.send_after(self(), :beat, @interval)
+  #       case signal do
+  #         %{"state" => "quiet"} -> send(self(), :quiet)
+  #         %{"state" => "terminate"} -> send(self(), :stop)
+  #       end
 
-      {:ok, %{"state" => "stop"} = signal} ->
-        Logger.debug("wid-#{wid} Heartbeat #{inspect signal}")
-        send(self(), :stop)
-        Process.send_after(self(), :beat, @interval)
+  #     {:ok, %{"state" => "stop"} = signal} ->
+  #       Logger.debug("wid-#{wid} Heartbeat #{inspect signal}")
+  #       send(self(), :stop)
+  #       Process.send_after(self(), :beat, @interval)
 
-      {:ok, signal} ->
-        Logger.debug("wid-#{wid} Heartbeat #{signal}")
-        Process.send_after(self(), :beat, @interval)
+  #     {:ok, signal} ->
+  #       Logger.debug("wid-#{wid} Heartbeat #{signal}")
+  #       Process.send_after(self(), :beat, @interval)
 
-      {:error, reason} ->
-        Logger.warn("Network error in heartbeat for wid-#{wid}: #{reason} -- retrying in 1s")
-        Process.send_after(self(), :beat, 1000)
-    end
+  #     {:error, reason} ->
+  #       Logger.warn("Network error in heartbeat for wid-#{wid}: #{reason} -- retrying in 1s")
+  #       Process.send_after(self(), :beat, 1000)
+  #   end
 
-    {:noreply, state}
-  end
+  #   {:noreply, state}
+  # end
 
   def handle_info(:quiet, %{quiet: true} = state), do: {:noreply, state}
   def handle_info(:quiet, state) do

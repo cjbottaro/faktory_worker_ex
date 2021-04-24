@@ -1,364 +1,204 @@
 defmodule Faktory.Client do
-  @not_connected "not_connected"
+  @moduledoc ~S"""
+  Pooled connections to a Faktory server.
 
-  @moduledoc """
-  Low level client connection to a Faktory server.
+  This is what you want to use to enqueue jobs to the Faktory server, using
+  either `push/3` directly or `c:Faktory.Job.perform_async/2`.
 
-  You shouldn't really need to use this directly, but it can useful for raw
-  pushes, getting server info, and using the mutate API.
-
-  ## Quickstart
   ```
-  {ok, client} = Faktory.Client.start_link()
-  {:ok, info} = Faktory.Client.info(client)
-  {:ok, job} = Faktory.Client.push(client, jobtype: "Some::Ruby::Class", args: [1, 2])
-  ```
+  defmodule MyJob do
+    use Faktory.Job, client: MyClient
 
-  ## Features
+    def perform(n1, n2) do
+      IO.puts("#{n1} plus #{n2} equals #{n1+n2}")
+    end
+  end
 
-  This module uses the awesome `Connection` library in addition to "active"
-  socket connections. This means that connections are _proactively_ reconnected
-  on disconnection, even if they are completely idle. This is in contrast to
-  passive connections that require some kind of usage to detect a disconnection.
-
-  You can see this in action by making a connection to the Faktory server, then
-  restarting the server.
-  ```
-  {:ok, conn} = Faktory.Client.start_link()
-
-  15:04:31.727 [debug] Connection established to localhost:7419 in 43ms
-
-  {:ok, #PID<0.231.0>}
-
-  # Restart Faktory server
-
-  15:04:40.689 [warn]  Disconnected from localhost:7419 (tcp_closed)
-
-  15:04:40.693 [warn]  Connection failed to localhost:7419 (closed), down for 4ms
-
-  15:04:41.695 [warn]  Connection failed to localhost:7419 (econnrefused), down for 1006ms
-
-  15:04:42.696 [warn]  Connection failed to localhost:7419 (econnrefused), down for 2007ms
-
-  {:error, #{inspect @not_connected}} = Faktory.Client.info(conn)
-
-  15:04:43.698 [warn]  Connection failed to localhost:7419 (econnrefused), down for 3009ms
-
-  15:04:44.699 [warn]  Connection failed to localhost:7419 (econnrefused), down for 4010ms
-
-  15:04:45.700 [warn]  Connection failed to localhost:7419 (econnrefused), down for 5011ms
-
-  15:04:46.701 [warn]  Connection failed to localhost:7419 (econnrefused), down for 6012ms
-
-  15:04:47.714 [info]  Connection reestablished to localhost:7419 in 7026ms
-
-  {:ok, info} = Faktory.Client.info(conn)
+  {:ok, client} = Faktory.Client.start_link(name: MyClient)
+  {:ok, job} = Faktory.Client.push(client, jobtype: "MyJob", args: [1, 2])
+  {:ok, job} = MyJob.perform_async([1, 2])
   ```
 
-  ## Caveats
+  ## Using as a module
 
-  The Faktory server answers requests in the order it receives them. This means if you
-  share a single `Faktory.Client` connection between several processes, responses are
-  serialized. This is very evident if you call `fetch/2` which can take up to 2 seconds
-  to get a response.
+  This is nice so you don't have to constantly pass around a pid or name.
+
   ```
-  {ok, conn} = Faktory.Client.start_link()
-  Task.start(fn -> Faktory.Client.fetch(conn, "foobar") |> IO.inspect() end)
-  Process.sleep(10)
-  Faktory.Client.info(conn)
+  defmodule MyClient do
+    use Faktory.Client, host: "faktory.myapp.com", pool_size: 10
+  end
 
-  15:17:42.549 [debug] fetch executed in 2038ms
-  {:ok, nil}
-
-  15:17:42.560 [debug] info executed in 2038ms
-  {:ok, ...}
+  MyClient.start_link()
+  {:ok, info} = MyClient.info()
+  {:ok, job} = MyClient.push(jobtype: "MyJob", args: [1, 2])
   ```
 
-  In other words, the `info/1` call had to wait for the `fetch/2` to finish.
+  The keyword list argument to `use` will be passed to `start_link/1`.
 
-  Consider using `Faktory.Client.Pool` to get around this problem.
+  ## Default configuration
+
+  You can override the default options that are sent to `start_link/1` using `Config`.
+
+  ```
+  config :faktory_worker_ex, Faktory.Client,
+    host: "faktory.myapp.com",
+    pool_size: 2,
+    lazy: false
+  ```
+
+  These will be merged with `defaults/0` and can be seen with `config/0`.
+
   """
+  @behaviour NimblePool
 
-  use Connection
-  require Logger
-  alias Faktory.{Socket, Protocol, Resp}
-
-  def info(client) do
-    case Connection.call(client, :info) do
-      {:ok, info} -> {:ok, Jason.decode!(info)}
-      error -> error
-    end
+  @impl NimblePool
+  def init_worker(config) do
+    {:ok, conn} = Faktory.Connection.start_link(config)
+    {:ok, conn, config}
   end
 
-  def push(client, job, _opts \\ []) do
-    job = Faktory.Job.new(job)
-    case Connection.call(client, {:push, job}) do
-      :ok -> {:ok, job}
-      error -> error
-    end
+  @impl NimblePool
+  def handle_checkout(:checkout, _from, conn, config) do
+    {:ok, conn, conn, config}
   end
 
-  def fetch(client, queues, opts \\ [])
-
-  def fetch(client, queues, opts) when is_list(queues) do
-    fetch(client, Enum.join(queues, " "), opts)
-  end
-
-  def fetch(client, queues, _opts) when is_binary(queues) do
-    case Connection.call(client, {:fetch, queues}) do
-      {:ok, job} when is_binary(job) -> {:ok, Faktory.Job.new(job)}
-      result -> result
-    end
-  end
-
-  def ack(client, jid) when is_binary(jid) do
-    Connection.call(client, {:ack, jid})
-  end
-
-  def fail(client, jid, errtype, message, backtrace \\ []) do
-    Connection.call(client, {:fail, jid, errtype, message, backtrace})
-  end
-
-  def flush(client) do
-    Connection.call(client, :flush)
-  end
-
-  def beat(client) do
-    case Connection.call(client, :beat) do
-      {:ok, "OK"} -> :ok
-      {:ok, json} -> {:ok, Jason.decode!(json)}
-      error -> error
-    end
-  end
-
-  @doc false
-  def crash(client) do
-    Connection.cast(client, :crash)
-  end
+  @type t :: GenServer.server()
 
   @defaults [
-    host: "localhost",
-    port: 7419,
-    password: nil,
-    tls: false,
-    wid: nil,
+    pool_size: 5,
+    lazy: true,
   ]
+  @doc """
+  Default configuration.
 
-
+  ```
+  #{inspect @defaults, pretty: true, width: 0}
+  ```
+  """
+  @spec defaults() :: Keyword.t
   def defaults do
-    defaults = Application.get_application(__MODULE__)
+    @defaults
+  end
+
+  @doc """
+  Configuration from `Config`.
+
+  The options specified with `Config` will be merged with `defaults/0`.
+
+  ```
+  config :faktory_worker_ex, #{inspect __MODULE__}, pool_size: 2
+
+  iex(1)> #{inspect __MODULE__}.config()
+  #{inspect Keyword.merge(@defaults, pool_size: 2), pretty: true, width: 0}
+  ```
+  """
+  @spec config() :: Keyword.t
+  def config do
+    config = Application.get_application(__MODULE__)
     |> Application.get_env(__MODULE__, [])
 
-    Keyword.merge(@defaults, defaults)
+    Keyword.merge(@defaults, config)
   end
 
-  def start_link(config \\ [], opts \\ []) do
-    config = Keyword.merge(defaults(), config)
+  @doc """
+  Start up a client.
 
-    config = if Keyword.has_key?(config, :use_tls) do
-      Logger.warn(":use_tls is deprecated, use :tls instead")
-      {use_tls, config} = Keyword.pop!(config, :use_tls)
-      Keyword.put(config, :tls, use_tls)
-    else
-      config
-    end
+  `opts` is merged over `config/0`. All options are optional.
 
-    Connection.start_link(__MODULE__, config, opts)
+  ## Options
+
+  * `:pool_size` (integer) how many connections are in the pool.
+  * `:lazy` (boolean) true if the connections are to started lazily.
+  * `:name` (`t:GenServer.name/0`) for GenServer name registration.
+
+  All remaining options are passed to `Faktory.Connection.start_link/1`.
+
+  ## Examples
+
+  ```
+  {:ok, client} = #{inspect __MODULE__}.start_link(host: "foo.bar.com", name: MyClient)
+
+  {:ok, client} = #{inspect __MODULE__}.start_link(pool_size: 2, lazy: false)
+  ```
+  """
+  def start_link(opts \\ []) do
+    {pool_opts, config} = Keyword.split(opts, [:pool_size, :lazy, :name])
+
+    @defaults
+    |> Keyword.merge(pool_opts)
+    |> Keyword.put(:worker, {__MODULE__, config})
+    |> NimblePool.start_link()
   end
 
-  def init(config) do
-    state = %{
-      config: Map.new(config),
-      socket: nil,
-      greeting: nil,
-      connecting_at: System.monotonic_time(:microsecond),
-      disconnected: false,
-      calls: :queue.new(),
-    }
+  @doc """
+  Get a connection from the pool.
 
-    establish_connection(state)
+  The connection is returned to the pool automatically after the function is run.
+
+  You shouldn't really need to use this function.
+  ```
+  {:ok, info} = #{inspect __MODULE__}.with_conn(client, fn conn ->
+    Faktory.Connection.info(conn)
+  end)
+  ```
+  """
+  @spec with_conn(t, (Faktory.Connection.t -> any)) :: any
+  def with_conn(client, f) do
+    NimblePool.checkout!(client, :checkout, fn _, conn ->
+      {f.(conn), conn}
+    end)
   end
 
-  def connect(:backoff, state) do
-    establish_connection(%{state | disconnected: true})
+  @doc """
+  Get Faktory server info.
+
+  See `Faktory.Connection.info/1`.
+  """
+  @spec info(t) :: {:ok, map} | {:error, term}
+  def info(client) do
+    with_conn(client, fn conn -> Faktory.Connection.info(conn) end)
   end
 
-  def disconnect(reason, state) do
-    # Sure why not.
-    :ok = Socket.close(state.socket)
+  @doc """
+  Enqueue a job.
 
-    # Logging.
-    :telemetry.execute(
-      [:faktory, :client, :connection, :disconnect],
-      %{},
-      %{config: state.config, reason: reason}
-    )
-
-    # Update our state.
-    state = %{state |
-      socket: nil,
-      connecting_at: System.monotonic_time(:microsecond),
-      disconnected: true
-    }
-
-    # Try to reconnect immediately.
-    {:connect, :backoff, state}
+  See `Faktory.Connection.push/3`.
+  """
+  @spec push(t, Faktory.push_job, Keyword.t) :: {:ok, Faktory.push_job} | {:error, term}
+  def push(client, job, opts \\ []) do
+    with_conn(client, fn conn -> Faktory.Connection.push(conn, job, opts) end)
   end
 
-  def handle_info({:tcp, socket, line}, state) when state.socket == socket do
-    {{from, at, call}, state} = pop_call(state)
+  @doc """
+  Reset Faktory server.
 
-    :telemetry.execute(
-      [:faktory, :socket, :recv],
-      %{usec: System.monotonic_time(:microsecond) - at},
-      %{result: {:ok, line}}
-    )
-
-    result = case Resp.parse(line, socket) do
-      {:ok, {:error, reason}} -> {:error, reason} # Translate RESP -ERR errors.
-      any -> any
-    end
-
-    import Connection, only: [reply: 2]
-
-    case result do
-      {:error, reason} -> reply(from, {:error, reason})
-
-      {:ok, result} -> case call do
-
-        :info -> reply(from, {:ok, result})
-
-        :push -> reply(from, :ok)
-
-        :fetch -> reply(from, {:ok, result})
-
-        :ack -> reply(from, :ok)
-
-        :fail -> reply(from, :ok)
-
-        :flush -> reply(from, :ok)
-
-        :beat -> reply(from, {:ok, result})
-
-      end
-    end
-
-    :telemetry.execute(
-      [:faktory, :client, :call, call],
-      %{usec: System.monotonic_time(:microsecond) - at},
-      %{result: result}
-    )
-
-    :ok = Socket.active(socket, :once)
-
-    {:noreply, state}
+  See `Faktory.Connection.flush/1`.
+  """
+  @spec flush(t) :: :ok | {:error, term}
+  def flush(client) do
+    with_conn(client, fn conn -> Faktory.Connection.flush(conn) end)
   end
 
-  def handle_info({:tcp_closed, socket}, state) when state.socket == socket do
-    {:disconnect, :tcp_closed, state}
+  @doc """
+  Mutate API
+
+  See `Faktory.Connection.mutate/2`.
+  """
+  @spec mutate(t, Keyword.t | map) :: :ok | {:error, term}
+  def mutate(client, mutation) do
+    with_conn(client, fn conn -> Faktory.Connection.mutate(conn, mutation) end)
   end
 
-  def handle_call(_, _, %{socket: nil} = state) do
-    {:reply, {:error, @not_connected}, state}
-  end
+  # def fetch(client, queues, opts \\ []) do
+  #   with_conn(client, fn conn -> Faktory.Connection.fetch(conn, queues, opts) end)
+  # end
 
-  def handle_call(:info, from, state) do
-    Socket.send(state.socket, Protocol.info())
-    {:noreply, push_call(from, :info, state)}
-  end
+  # def ack(client, jid) do
+  #   with_conn(client, fn conn -> Faktory.Connection.ack(conn, jid) end)
+  # end
 
-  def handle_call({:push, job}, from, state) do
-    Socket.send(state.socket, Protocol.push(job))
-    {:noreply, push_call(from, :push, state)}
-  end
-
-  def handle_call({:fetch, queues}, from, state) do
-    Socket.send(state.socket, Protocol.fetch(queues))
-    {:noreply, push_call(from, :fetch, state)}
-  end
-
-  def handle_call({:ack, jid}, from, state) do
-    Socket.send(state.socket, Protocol.ack(jid))
-    {:noreply, push_call(from, :ack, state)}
-  end
-
-  def handle_call({:fail, jid, errtype, message, backtrace}, from, state) do
-    Socket.send(state.socket, Protocol.fail(jid, errtype, message, backtrace))
-    {:noreply, push_call(from, :fail, state)}
-  end
-
-  def handle_call(:beat, from, state) do
-    Socket.send(state.socket, Protocol.beat(state.config.wid))
-    {:noreply, push_call(from, :beat, state)}
-  end
-
-  def handle_call(:flush, from, state) do
-    Socket.send(state.socket, Protocol.flush())
-    {:noreply, push_call(from, :flush, state)}
-  end
-
-  def handle_cast(:crash, _state) do
-    raise "crash"
-  end
-
-  defp push_call(from, name, state) do
-    %{calls: calls} = state
-
-    item = {
-      from,
-      System.monotonic_time(:microsecond),
-      name
-    }
-
-    calls = :queue.in(item, calls)
-
-    %{state | calls: calls}
-  end
-
-  defp pop_call(state) do
-    %{calls: calls} = state
-
-    {{:value, call}, calls} = :queue.out(calls)
-
-    state = %{state | calls: calls}
-
-    {call, state}
-  end
-
-  defp establish_connection(state) do
-    case connect_and_handshake(state) do
-      {:ok, socket, greeting} ->
-        :telemetry.execute(
-          [:faktory, :client, :connection, :success],
-          %{usec: System.monotonic_time(:microsecond) - state.connecting_at},
-          %{config: state.config, disconnected: state.disconnected}
-        )
-        {:ok, %{state | socket: socket, greeting: greeting}}
-
-      {:error, reason} ->
-        :telemetry.execute(
-          [:faktory, :client, :connection, :failure],
-          %{usec: System.monotonic_time(:microsecond) - state.connecting_at},
-          %{config: state.config, reason: reason}
-        )
-        {:backoff, 1000, state}
-    end
-  end
-
-  defp connect_and_handshake(state) do
-    %{host: host, port: port} = state.config
-
-    opts = [:binary, active: false, packet: :line]
-    with {:ok, socket} <- Socket.connect(host, port, opts),
-      {:ok, <<"HI", greeting::binary>>} <- Resp.recv(socket),
-      {:ok, greeting} <- Jason.decode(greeting),
-      hello = Protocol.hello(greeting, state.config),
-      :ok <- Socket.send(socket, hello),
-      {:ok, "OK"} <- Resp.recv(socket),
-      :ok <- Socket.active(socket, :once)
-    do
-      {:ok, socket, greeting}
-    end
-  end
+  # def fail(client, jid, errtype, message, backtrace \\ []) do
+  #   with_conn(client, fn conn -> Faktory.Connection.fail(conn, jid, errtype, message, backtrace) end)
+  # end
 
 end

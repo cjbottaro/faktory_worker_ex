@@ -50,6 +50,7 @@ defmodule Faktory.Mixfile do
       {:jason, "~> 1.1"},
       {:poolboy, "~> 1.5"},
       {:gen_stage, "~> 1.0"},
+      {:nimble_pool, "~> 0.0"},
       {:telemetry, "~> 0.4"},
       {:ex_doc, "~> 0.19", only: :dev},
       {:mox, "~> 0.3", only: :test},

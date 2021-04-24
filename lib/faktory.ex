@@ -1,5 +1,4 @@
 defmodule Faktory do
-  @moduledoc false
 
   # Represents a unique job id.
   @type jid :: binary
@@ -13,7 +12,7 @@ defmodule Faktory do
     %{binary => json}
   )
 
-  @type job :: %{
+  @type fetch_job :: %{
     required(:jid) => binary,
     required(:jobtype) => binary,
     required(:args) => [term],
@@ -24,8 +23,29 @@ defmodule Faktory do
     optional(:backtrace) => non_neg_integer(),
     optional(:created_at) => binary,
     optional(:enqueued_at) => binary,
-    optional(:failure) => map,
-    optional(:custom) => map
+    optional(:failure) => json,
+    optional(:custom) => json
+  }
+
+  @typedoc """
+  Job argument for `Faktory.Client.push/3` and `Faktory.Connection.push/3`.
+
+  If `:jid` is not specified, it will be filled out automatically (recommended).
+
+  If `:args` is not specified, it will default to `[]`.
+
+  See [The Job Payload](https://github.com/contribsys/faktory/wiki/The-Job-Payload) for more info.
+  """
+  @type push_job :: Keyword.t | %{
+    required(:jobtype) => binary,
+    required(:queue) => binary,
+    optional(:args) => [json],
+    optional(:jid) => binary,
+    optional(:reserve_for) => non_neg_integer(),
+    optional(:at) => binary,
+    optional(:retry) => non_neg_integer(),
+    optional(:backtrace) => non_neg_integer(),
+    optional(:custom) => json
   }
 
   # A connection to the Faktory server.
