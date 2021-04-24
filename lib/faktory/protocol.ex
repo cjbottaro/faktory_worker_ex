@@ -10,7 +10,7 @@ defmodule Faktory.Protocol do
 
   @type jid :: binary
 
-  def hello(_greeting, _config) do
+  def hello(_greeting, config) do
     # %{
     #   password: state.password,
     #   hostname: Utils.hostname,
@@ -24,9 +24,15 @@ defmodule Faktory.Protocol do
       pid: Faktory.Utils.unix_pid(),
       labels: ["elixir"],
       v: 2
-    } |> Jason.encode!()
+    }
 
-    ["HELLO", " ", payload, "\r\n"]
+    payload = if config.wid do
+      Map.put(payload, :wid, config.wid)
+    else
+      payload
+    end
+
+    ["HELLO", " ", Jason.encode!(payload), "\r\n"]
   end
 
   def info do
@@ -46,7 +52,8 @@ defmodule Faktory.Protocol do
   end
 
   def beat(wid) do
-    ["BEAT", " ", Jason.encode!(%{wid: wid}), "\r\n"]
+    rss_kb = (:erlang.memory(:total) / 1024) |> round()
+    ["BEAT", " ", Jason.encode!(%{wid: wid, rss_kb: rss_kb}), "\r\n"]
   end
 
   def flush do

@@ -1,10 +1,11 @@
 defmodule Faktory.Connection do
-  @not_connected "not_connected"
+  @not_connected :not_connected
 
   @moduledoc """
   Low level connection to a Faktory server.
 
-  You shouldn't really need to use this directly, see `Faktory.Client` instead.
+  You shouldn't really need to use this directly (other than configuring it);
+  use `Faktory.Client` instead.
 
   ## Default configuration
 
@@ -102,6 +103,8 @@ defmodule Faktory.Connection do
   use Connection
   require Logger
   alias Faktory.{Socket, Protocol, Resp}
+
+  @beat_interval 15_000
 
   @defaults [
     host: "localhost",
@@ -237,13 +240,22 @@ defmodule Faktory.Connection do
   If there are no jobs on the server, this function will block up to two seconds
   for one.
 
+  If the connection was "quieted" or "stopped" from the Faktory UI, then this
+  function will return either `{:error, :quiet}` or `{:error, :terminate}`
+  respectively.
+
   ```
   {:ok, job} = #{inspect __MODULE__}.fetch(conn, "default")
   {:ok, job} = #{inspect __MODULE__}.fetch(conn, "queue-one queue-two")
   {:ok, job} = #{inspect __MODULE__}.fetch(conn, ["queue-one", "queue-two"])
   ```
   """
-  @spec fetch(t, binary | [binary]) :: {:ok, Faktory.fetch_job} | {:ok, nil} | {:error, term}
+  @spec fetch(t, binary | [binary]) ::
+    {:ok, Faktory.fetch_job}
+    | {:ok, nil}
+    | {:error, :quiet}
+    | {:error, :terminate}
+    | {:error, term}
 
   def fetch(conn, queues) when is_list(queues) do
     fetch(conn, Enum.join(queues, " "))
@@ -337,6 +349,8 @@ defmodule Faktory.Connection do
       connecting_at: System.monotonic_time(:microsecond),
       disconnected: false,
       calls: :queue.new(),
+      beat_timer: nil,
+      beat_state: nil,
     }
 
     establish_connection(state)
@@ -364,6 +378,11 @@ defmodule Faktory.Connection do
       disconnected: true
     }
 
+    # Can't heartbeat if not connected.
+    if state.beat_timer do
+      Process.cancel_timer(state.beat_timer)
+    end
+
     # Try to reconnect immediately.
     {:connect, :backoff, state}
   end
@@ -382,45 +401,78 @@ defmodule Faktory.Connection do
       any -> any
     end
 
-    import Connection, only: [reply: 2]
-
-    case result do
-      {:error, reason} -> reply(from, {:error, reason})
-
-      {:ok, result} -> case call do
-
-        :info -> reply(from, {:ok, result})
-
-        :push -> reply(from, :ok)
-
-        :fetch -> reply(from, {:ok, result})
-
-        :ack -> reply(from, :ok)
-
-        :fail -> reply(from, :ok)
-
-        :flush -> reply(from, :ok)
-
-        :beat -> reply(from, {:ok, result})
-
-        :mutate -> reply(from, :ok)
-
-      end
-    end
-
-    :telemetry.execute(
-      [:faktory, :connection, :call, call],
-      %{usec: System.monotonic_time(:microsecond) - at},
-      %{result: result}
-    )
-
     :ok = Socket.active(socket, :once)
 
-    {:noreply, state}
+    # Intercept heartbeats.
+    if call == :beat do
+
+      handle_beat(result, at, state)
+
+    else
+
+      import Connection, only: [reply: 2]
+
+      case result do
+        {:error, reason} -> reply(from, {:error, reason})
+
+        {:ok, result} -> case call do
+
+          :info -> reply(from, {:ok, result})
+
+          :push -> reply(from, :ok)
+
+          :fetch -> reply(from, {:ok, result})
+
+          :ack -> reply(from, :ok)
+
+          :fail -> reply(from, :ok)
+
+          :flush -> reply(from, :ok)
+
+          :mutate -> reply(from, :ok)
+
+        end
+      end
+
+      :telemetry.execute(
+        [:faktory, :connection, :call, call],
+        %{usec: System.monotonic_time(:microsecond) - at},
+        %{result: result}
+      )
+
+      {:noreply, state}
+
+    end
   end
 
   def handle_info({:tcp_closed, socket}, state) when state.socket == socket do
     {:disconnect, :tcp_closed, state}
+  end
+
+  def handle_info(:beat, state) do
+    Socket.send(state.socket, Protocol.beat(state.config.wid))
+    {:noreply, push_call(nil, :beat, state)}
+  end
+
+  def handle_beat(result, at, state) do
+    beat_state = case result do
+      {:ok, "OK"} -> nil
+      {:ok, json} -> Jason.decode!(json) |> Map.fetch!("state") |> String.to_atom()
+      {:error, reason} ->
+        Logger.error("Heartbeat #{reason}")
+        nil
+    end
+
+    :telemetry.execute(
+      [:connection, :heartbeat],
+      %{usec: System.monotonic_time(:microsecond) - at},
+      %{result: result}
+    )
+
+    {:noreply, %{state |
+      beat_timer: Process.send_after(self(), :beat, @beat_interval),
+      beat_state: beat_state
+    }}
   end
 
   def handle_call(_, _, %{socket: nil} = state) do
@@ -437,6 +489,10 @@ defmodule Faktory.Connection do
     {:noreply, push_call(from, :push, state)}
   end
 
+  def handle_call({:fetch, _queues}, _from, state) when state.beat_state in [:quiet, :terminate] do
+    {:reply, {:error, state.beat_state}, state}
+  end
+
   def handle_call({:fetch, queues}, from, state) do
     Socket.send(state.socket, Protocol.fetch(queues))
     {:noreply, push_call(from, :fetch, state)}
@@ -450,11 +506,6 @@ defmodule Faktory.Connection do
   def handle_call({:fail, jid, errtype, message, backtrace}, from, state) do
     Socket.send(state.socket, Protocol.fail(jid, errtype, message, backtrace))
     {:noreply, push_call(from, :fail, state)}
-  end
-
-  def handle_call(:beat, from, state) do
-    Socket.send(state.socket, Protocol.beat(state.config.wid))
-    {:noreply, push_call(from, :beat, state)}
   end
 
   def handle_call(:flush, from, state) do
@@ -503,7 +554,12 @@ defmodule Faktory.Connection do
           %{usec: System.monotonic_time(:microsecond) - state.connecting_at},
           %{config: state.config, disconnected: state.disconnected}
         )
-        {:ok, %{state | socket: socket, greeting: greeting}}
+        timer = if state.config.wid do
+          Process.send_after(self(), :beat, @beat_interval)
+        else
+          nil
+        end
+        {:ok, %{state | socket: socket, greeting: greeting, beat_timer: timer}}
 
       {:error, reason} ->
         :telemetry.execute(
