@@ -165,8 +165,8 @@ defmodule Faktory.Client do
   See `Faktory.Connection.push/3`.
   """
   @spec push(t, Faktory.push_job, Keyword.t) :: {:ok, Faktory.push_job} | {:error, term}
-  def push(client, job, opts \\ []) do
-    with_conn(client, fn conn -> Faktory.Connection.push(conn, job, opts) end)
+  def push(client, opts \\ [], job) do
+    with_conn(client, fn conn -> Faktory.Connection.push(conn, opts, job) end)
   end
 
   @doc """

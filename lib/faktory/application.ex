@@ -5,9 +5,7 @@ defmodule Faktory.Application do
   def start(_type, _args) do
     :ok = Faktory.Logger.init()
 
-    children = [
-      {DynamicSupervisor, strategy: :one_for_one, name: ConnectionPool}
-    ]
+    children = []
     Supervisor.start_link(children, strategy: :one_for_one)
   end
 end

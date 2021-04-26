@@ -8,16 +8,19 @@ defmodule Faktory.Logger do
       [
         [:faktory, :socket, :recv],
         [:faktory, :socket, :send],
-        [:faktory, :client, :connection, :success],
-        [:faktory, :client, :connection, :failure],
-        [:faktory, :client, :connection, :disconnect],
-        [:faktory, :client, :call, :info],
-        [:faktory, :client, :call, :push],
-        [:faktory, :client, :call, :fetch],
-        [:faktory, :client, :call, :ack],
-        [:faktory, :client, :call, :fail],
-        [:faktory, :client, :call, :flush],
-        [:faktory, :client, :call, :beat],
+        [:faktory, :connection, :success],
+        [:faktory, :connection, :failure],
+        [:faktory, :connection, :disconnect],
+        [:faktory, :client, :info],
+        [:faktory, :client, :push],
+        [:faktory, :client, :fetch],
+        [:faktory, :client, :ack],
+        [:faktory, :client, :fail],
+        [:faktory, :client, :flush],
+        [:faktory, :job, :start],
+        [:faktory, :job, :ack],
+        [:faktory, :job, :fail],
+        [:faktory, :job, :timeout],
       ],
       &__MODULE__.log/4,
       nil
@@ -53,7 +56,7 @@ defmodule Faktory.Logger do
     Logger.debug("->> #{inspect data} in #{time}")
   end
 
-  def log([:faktory, :client, :connection, :success], %{usec: usec}, meta, _config) do
+  def log([:faktory, :connection, :success], %{usec: usec}, meta, _config) do
     time = Faktory.Utils.format_duration(usec)
     server = "#{meta.config.host}:#{meta.config.port}"
 
@@ -64,20 +67,20 @@ defmodule Faktory.Logger do
     end
   end
 
-  def log([:faktory, :client, :connection, :failure], %{usec: usec}, meta, _config) do
+  def log([:faktory, :connection, :failure], %{usec: usec}, meta, _config) do
     time = Faktory.Utils.format_duration(usec)
     server = "#{meta.config.host}:#{meta.config.port}"
 
     Logger.warn("Connection failed to #{server} (#{meta.reason}), down for #{time}")
   end
 
-  def log([:faktory, :client, :connection, :disconnect], _time, meta, _config) do
+  def log([:faktory, :connection, :disconnect], _time, meta, _config) do
     server = "#{meta.config.host}:#{meta.config.port}"
 
     Logger.warn("Disconnected from #{server} (#{meta.reason})")
   end
 
-  def log([:faktory, :client, :call, call], %{usec: usec}, meta, _config) do
+  def log([:faktory, :call, call], %{usec: usec}, meta, _config) do
     time = Faktory.Utils.format_duration(usec)
     case meta.result do
       {:error, _reason} ->
@@ -87,6 +90,41 @@ defmodule Faktory.Logger do
     end
   end
 
+  def log([:faktory, :job, :start], _time, meta, _config) do
+    %{job: job, worker: worker} = meta
+    %{jid: jid, jobtype: jobtype, args: args} = job
+    args = inspect(args, binaries: :as_strings, charlists: :as_lists)
+    name = worker_name(worker)
+    Logger.info "🚀 #{name} started jid-#{jid} (#{jobtype}) #{args}"
+  end
+
+  def log([:faktory, :job, :ack], %{usec: usec}, meta, _config) do
+    %{job: job, worker: worker} = meta
+    %{jid: jid, jobtype: jobtype} = job
+    time = Faktory.Utils.format_duration(usec)
+    name = worker_name(worker)
+    Logger.info "🥂 #{name} acked jid-#{jid} (#{jobtype}) in #{time}"
+  end
+
+  def log([:faktory, :job, :fail], %{usec: usec}, meta, _config) do
+    %{job: job, worker: worker} = meta
+    %{jid: jid, jobtype: jobtype} = job
+    time = Faktory.Utils.format_duration(usec)
+    name = worker_name(worker)
+    Logger.info "💥 #{name} failed jid-#{jid} (#{jobtype}) in #{time}"
+  end
+
+  def log([:faktory, :job, :timeout], %{usec: usec}, meta, _config) do
+    %{job: job, worker: worker} = meta
+    %{jid: jid, jobtype: jobtype} = job
+    time = Faktory.Utils.format_duration(usec)
+    name = worker_name(worker)
+    Logger.info "⏱  #{name} timed out jid-#{jid} (#{jobtype}) in #{time}"
+  end
+
   def log(_, _, _, _), do: nil
+
+  defp worker_name(%{name: module}) when is_atom(module), do: inspect(module)
+  defp worker_name(%{wid: wid}), do: wid
 
 end

@@ -6,53 +6,32 @@ defmodule Faktory.Error do
     defexception [:message]
   end
 
-  defstruct [:errtype, :message, trace: []]
+  defmodule ProcessExit do
+    @moduledoc false
+    defexception [:message]
+  end
 
-  def from_reason(reason) do
+  @spec down_reason_to_exception(reason :: {atom | struct, list} | atom) :: {struct, list}
+  def down_reason_to_exception(reason) do
     case reason do
-      {error, trace} -> if Exception.exception?(error) do
-        handle_exception(error, trace)
-      else
-        handle_error(reason)
-      end
-      reason -> handle_exit(reason)
+      {reason, trace} when (is_atom(reason) or is_struct(reason)) and is_list(trace) ->
+        e = Exception.normalize(:error, reason, trace)
+        {e, trace}
+
+      reason when is_atom(reason) ->
+        e = %__MODULE__.ProcessExit{message: to_string(reason)}
+        {e, []}
     end
   end
 
-  defp handle_exception(exception, trace) do
-    trace = Exception.format_stacktrace(trace)
-    |> String.split("\n")
-    |> Enum.map(&String.replace_leading(&1, " ", ""))
+  def down_reason_to_fail_info(reason) do
+    {e, trace} = down_reason_to_exception(reason)
 
-    %__MODULE__{
-      errtype: exception.__struct__ |> inspect,
-      message: Exception.message(exception),
-      trace: trace
-    }
-  end
+    errtype = inspect(e.__struct__)
+    message = e.message
+    backtrace = Enum.map(trace, &Exception.format_stacktrace_entry/1)
 
-  defp handle_error(reason) do
-    lines = Exception.format_exit(reason)
-    |> String.split("\n")
-    |> Enum.map(&String.replace_leading(&1, " ", ""))
-
-    [_trash, type | trace] = lines
-    [_trace, errtype, message] = String.split(type, " ", parts: 3)
-
-    errtype = String.replace_prefix(errtype, "(", "")
-    errtype = String.replace_suffix(errtype, ")", "")
-
-    %__MODULE__{
-      errtype: errtype,
-      message: message,
-      trace: trace
-    }
-  end
-
-  defp handle_exit(reason) do
-    %__MODULE__{
-      errtype: "exit", message: inspect(reason)
-    }
+    {errtype, message, backtrace}
   end
 
 end

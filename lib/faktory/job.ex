@@ -144,6 +144,9 @@ defmodule Faktory.Job do
       :failure,
       :custom
     ])
+    |> Map.put_new(:jid, Faktory.Utils.new_jid())
+    |> Map.put_new(:args, [])
+    |> Map.put_new(:reserve_for, 1800)
   end
 
   def new(fields) when is_binary(fields) do
@@ -162,6 +165,7 @@ defmodule Faktory.Job do
         Faktory.Job.config()
         |> Keyword.merge(@config)
         |> Keyword.merge(config)
+        |> Keyword.put_new(:jobtype, inspect(__MODULE__))
       end
 
       def perform_async(args, options \\ []) do

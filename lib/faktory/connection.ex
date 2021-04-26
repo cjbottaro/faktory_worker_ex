@@ -112,6 +112,7 @@ defmodule Faktory.Connection do
     password: nil,
     tls: false,
     wid: nil,
+    beat_receiver: nil,
   ]
 
   @doc """
@@ -157,6 +158,7 @@ defmodule Faktory.Connection do
   * `:tls` (boolean) if the server uses TLS
   * `:wid` (binary) Unique worker id
   * `:name` (`t:GenServer.name/0`) Name registration
+  * `:beat_receiver` (pid) Send messages to pid on state change.
 
   ## Worker mode
 
@@ -455,6 +457,8 @@ defmodule Faktory.Connection do
   end
 
   def handle_beat(result, at, state) do
+    %{config: config} = state
+
     beat_state = case result do
       {:ok, "OK"} -> nil
       {:ok, json} -> Jason.decode!(json) |> Map.fetch!("state") |> String.to_atom()
@@ -463,8 +467,12 @@ defmodule Faktory.Connection do
         nil
     end
 
+    if beat_state && config.beat_receiver do
+      send(config.beat_receiver, {:faktory, :beat, beat_state})
+    end
+
     :telemetry.execute(
-      [:connection, :heartbeat],
+      [:faktory, :connection, :heartbeat],
       %{usec: System.monotonic_time(:microsecond) - at},
       %{result: result}
     )
@@ -516,10 +524,6 @@ defmodule Faktory.Connection do
   def handle_call({:mutate, mutation}, from, state) do
     Socket.send(state.socket, Protocol.mutate(mutation))
     {:noreply, push_call(from, :mutate, state)}
-  end
-
-  def handle_cast(:crash, _state) do
-    raise "crash"
   end
 
   defp push_call(from, name, state) do

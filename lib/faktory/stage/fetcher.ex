@@ -1,19 +1,18 @@
 defmodule Faktory.Stage.Fetcher do
   @moduledoc false
 
-  defstruct [:config, :conn, :tracker, :error_count, :quiet]
-
   use GenStage
+  require Logger
 
   def child_spec(config) do
     %{
-      id: {config.module, __MODULE__},
+      id: {__MODULE__, config[:wid]},
       start: {__MODULE__, :start_link, [config]}
     }
   end
 
   def name(config) do
-    Faktory.Registry.name({config.module, __MODULE__, :fetcher})
+    {:global, {__MODULE__, config[:wid]}}
   end
 
   def start_link(config) do
@@ -21,63 +20,84 @@ defmodule Faktory.Stage.Fetcher do
   end
 
   def init(config) do
-    queues = Enum.join(config.queues, ", ")
+    queues = Enum.join(config[:queues], ", ")
     Faktory.Logger.debug "Fetcher stage #{inspect self()} starting up -- #{queues}"
-    {:ok, conn} = Faktory.Connection.start_link(config)
 
-    state = %__MODULE__{
-      config: config,
+    {:ok, conn} = config
+    |> Keyword.drop([:name])
+    |> Keyword.put(:beat_receiver, self())
+    |> Faktory.Connection.start_link()
+
+    state = %{
+      config: Map.new(config),
       conn: conn,
-      error_count: 0,
+      demand: 0,
+      errors: 0,
       quiet: false,
+      terminate: false,
     }
 
     {:producer, state}
   end
 
-  # If we've been quieted, don't fetch anything.
-  def handle_demand(1, %{quiet: true} = state), do: {:noreply, [], state}
+  # If there is no demand, it means we're idle, so start a fetch loop.
+  def handle_demand(1, %{demand: 0} = state) do
+    send(self(), :fetch)
+    {:noreply, [], %{state | demand: 1}}
+  end
 
+  # If there is already demand, we're already in a fetch loop.
   def handle_demand(1, state) do
-    conn = state.conn
-    queues = state.config.queues
+    {:noreply, [], %{state | demand: state.demand + 1}}
+  end
+
+  def handle_info(:fetch, %{quiet: true} = state), do: {:noreply, [], state}
+
+  def handle_info(:fetch, %{terminate: true} = state), do: {:noreply, [], state}
+
+  def handle_info(:fetch, state) do
+    %{config: config, conn: conn, demand: demand} = state
 
     # Blocks for up to two seconds before returning a job or nil.
-    case Faktory.Connection.fetch(conn, queues) do
+    case Faktory.Connection.fetch(conn, config.queues) do
 
       # Job found, send it down the pipeline!
-      {:ok, %{} = job} ->
-        {:noreply, [job], state}
+      {:ok, job} when is_map(job) ->
+        if demand > 1, do: send(self(), :fetch)
+        {:noreply, [job], %{state | demand: demand - 1}}
 
-      # No job found, manually trigger demand since consumers
-      # only ask once until they get something.
+      # No job found, try again.
       {:ok, nil} ->
-        send(self(), {:demand, 1})
+        send(self(), :fetch)
         {:noreply, [], state}
 
-      # Server error. Report and try again, I guess.
-      {:ok, {:error, reason}} ->
-        Faktory.Logger.warn("Server error during fetch: #{reason} -- retrying immediately")
-        send(self(), {:demand, 1})
-        {:noreply, [], state}
-
-      # Network error. Log, sleep, and try again.
       {:error, reason} ->
-        time = Faktory.Utils.exp_backoff(state.error_count)
-        Faktory.Logger.warn("Network error during fetch: #{reason} -- retrying in #{time/1000}s")
-        Process.send_after(self(), {:demand, 1}, time)
-        {:noreply, [], %{state | error_count: state.error_count + 1}}
+        time = Faktory.Utils.exp_backoff(state.errors)
+        Faktory.Logger.warn("Error during fetch: #{reason} -- retrying in #{time/1000}s")
+        Process.send_after(self(), :fetch, time)
+        {:noreply, [], %{state | errors: state.errors + 1}}
+
     end
 
   end
 
-  def handle_info({:demand, 1}, state) do
-    handle_demand(1, state)
+  def handle_info({:faktory, :beat, :quiet}, state) do
+    Logger.debug "Fetcher stage #{inspect self()} quieted -- #{state.demand} demand remaining"
+    {:noreply, [], %{state | quiet: true}}
   end
 
-  def handle_call(:quiet, _from, state) do
-    Faktory.Logger.info("Fetcher #{inspect self()} silenced")
-    {:reply, :ok, [], %{state | quiet: true}}
+  def handle_info({:faktory, :beat, :terminate}, state) do
+    Logger.debug "Fetcher stage #{inspect self()} instructed to terminate -- #{state.demand} demand remaining"
+    if not state.terminate do
+      Faktory.Worker.name(state.config)
+      |> Faktory.Worker.stop()
+    end
+    {:noreply, [], %{state | terminate: true}}
+  end
+
+  def handle_cast(:quiet, state) do
+    Logger.debug "Fetcher stage #{inspect self()} quieted -- #{state.demand} demand remaining"
+    {:noreply, [], %{state | quiet: true}}
   end
 
 end
