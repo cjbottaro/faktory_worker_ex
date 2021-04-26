@@ -3,6 +3,7 @@ defmodule Faktory.Stage.Fetcher do
 
   use GenStage
   require Logger
+  import Faktory.Worker, only: [human_name: 1]
 
   def child_spec(config) do
     %{
@@ -20,8 +21,7 @@ defmodule Faktory.Stage.Fetcher do
   end
 
   def init(config) do
-    queues = Enum.join(config[:queues], ", ")
-    Faktory.Logger.debug "Fetcher stage #{inspect self()} starting up -- #{queues}"
+    Logger.info "Fetcher stage for #{human_name(config)} starting up -- #{inspect config[:queues]}"
 
     {:ok, conn} = config
     |> Keyword.drop([:name])
@@ -71,9 +71,29 @@ defmodule Faktory.Stage.Fetcher do
         send(self(), :fetch)
         {:noreply, [], state}
 
+      # Very subtle race condition. Our fetch returns {:error, :quiet} or
+      # {:error, :terminate} before we receive the heartbeat status from our
+      # connection.
+
+      # 22:54:39.087 [debug] ->> "FETCH default\r\n" in 74μs
+      # 22:54:41.100 [debug] <<- "$-1\r\n" in 2013ms
+      # 22:54:41.100 [debug] ->> "FETCH default\r\n" in 34μs
+      # 22:54:41.929 [debug] ->> "BEAT {\"rss_kb\":42103,\"wid\":\"6ac5ee0075a56c3b\"}\r\n" in 60μs
+      # 22:54:43.110 [debug] <<- "$-1\r\n" in 2009ms
+      # 22:54:43.110 [debug] <<- "$17\r\n" in 1180ms
+      # 22:54:43.110 [debug] <<- "{\"state\":\"quiet\"}" in 19μs
+      # 22:54:43.110 [debug] <<- "\r\n" in 6μs
+      # 22:54:43.121 [warn]  Error during fetch: quiet -- retrying in 1.589s
+
+      # It actually doesn't affect anything except for a warning message
+      # (triggered by the last condition of this case statement), but we can
+      # prevent that by explicitly matching those cases.
+      {:error, :quiet} -> {:noreply, [], state}
+      {:error, :terminate} -> {:noreply, [], state}
+
       {:error, reason} ->
         time = Faktory.Utils.exp_backoff(state.errors)
-        Faktory.Logger.warn("Error during fetch: #{reason} -- retrying in #{time/1000}s")
+        Logger.warn("Error during fetch: #{reason} -- retrying in #{time/1000}s")
         Process.send_after(self(), :fetch, time)
         {:noreply, [], %{state | errors: state.errors + 1}}
 
@@ -82,21 +102,34 @@ defmodule Faktory.Stage.Fetcher do
   end
 
   def handle_info({:faktory, :beat, :quiet}, state) do
-    Logger.debug "Fetcher stage #{inspect self()} quieted -- #{state.demand} demand remaining"
+    %{config: config, demand: demand} = state
+
+    if not state.quiet do
+      Logger.info "Fetcher stage for #{human_name(config)} quieted by UI -- #{config.concurrency - demand} jobs running"
+    end
+
     {:noreply, [], %{state | quiet: true}}
   end
 
   def handle_info({:faktory, :beat, :terminate}, state) do
-    Logger.debug "Fetcher stage #{inspect self()} instructed to terminate -- #{state.demand} demand remaining"
+    %{config: config, demand: demand} = state
+
     if not state.terminate do
-      Faktory.Worker.name(state.config)
+      Logger.info "Fetcher stage for #{human_name(config)} stopped by UI -- #{config.concurrency - demand} jobs running"
+      Faktory.Worker.name(config)
       |> Faktory.Worker.stop()
     end
+
     {:noreply, [], %{state | terminate: true}}
   end
 
   def handle_cast(:quiet, state) do
-    Logger.debug "Fetcher stage #{inspect self()} quieted -- #{state.demand} demand remaining"
+    %{config: config} = state
+
+    if not state.quiet do
+      Logger.info "Fetcher stage for #{human_name(config)} quieted by shutdown"
+    end
+
     {:noreply, [], %{state | quiet: true}}
   end
 

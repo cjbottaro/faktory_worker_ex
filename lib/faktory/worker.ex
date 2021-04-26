@@ -203,6 +203,10 @@ defmodule Faktory.Worker do
       queues when is_binary(queues) -> String.split(queues, " ")
     end)
 
+    if config[:shutdown] < 1_000 do
+      raise ArgumentError, ":shutdown cannot be less than 1000 ms"
+    end
+
     start = case config[:start] do
       nil -> Application.get_env(:faktory_worker_ex, :start_via_mix, false)
       start -> start
@@ -230,6 +234,14 @@ defmodule Faktory.Worker do
   @doc false
   def name(config) do
     config[:name] || {:global, {__MODULE__, Keyword.fetch!(config, :wid)}}
+  end
+
+  @doc false
+  def human_name(config) do
+    case Access.fetch!(config, :name) do
+      name when is_atom(name) -> inspect(name)
+      name when is_tuple(name) -> Access.fetch!(config, :wid)
+    end
   end
 
   defmacro __using__(options) do

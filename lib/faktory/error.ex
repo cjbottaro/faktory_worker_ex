@@ -24,7 +24,7 @@ defmodule Faktory.Error do
     end
   end
 
-  def down_reason_to_fail_info(reason) do
+  def down_reason_to_fail_args(reason) do
     {e, trace} = down_reason_to_exception(reason)
 
     errtype = inspect(e.__struct__)

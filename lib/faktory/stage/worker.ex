@@ -3,6 +3,7 @@ defmodule Faktory.Stage.Worker do
 
   use GenStage
   require Logger
+  import Faktory.Worker, only: [human_name: 1]
 
   @reserve_for 1800
 
@@ -24,7 +25,7 @@ defmodule Faktory.Stage.Worker do
 
   def init(config) do
     Process.flag(:trap_exit, true) # For graceful shutdown.
-    Faktory.Logger.debug "Worker stage #{inspect self()} starting up -- #{config[:concurrency]}"
+    Logger.info "Worker stage for #{human_name(config)} starting up -- #{config[:concurrency]}"
 
     {:ok, conn} = Keyword.drop(config, [:wid, :name])
     |> Faktory.Connection.start_link()
@@ -126,11 +127,19 @@ defmodule Faktory.Stage.Worker do
   end
 
   def terminate(reason, state) do
-    count = map_size(state.tasks)
-    Faktory.Logger.debug "Worker stage #{inspect self()} shutting down -- #{count} jobs running"
+    %{config: config, tasks: tasks} = state
 
-    Map.values(state.tasks)
-    |> Task.yield_many(state.config.shutdown)
+    count = map_size(tasks)
+    Logger.info "Worker stage for #{human_name(config)} shutting down -- #{count} jobs running"
+
+    start_time = monotonic_time()
+
+    # Tell the fetcher to stop fetching.
+    :ok = Faktory.Stage.Fetcher.name(config)
+    |> GenServer.cast(:quiet)
+
+    Map.values(tasks)
+    |> Task.yield_many(config.shutdown - 1_000)
     |> Enum.each(fn
       {task, {:ok, _value}} -> ack(state, task)
       {task, {:exit, error}} -> fail(state, task, error)
@@ -140,6 +149,10 @@ defmodule Faktory.Stage.Worker do
         nil -> fail(task, reason, state)
       end
     end)
+
+    time = (monotonic_time() - start_time) |> Faktory.Utils.format_duration()
+
+    Logger.info "Worker stage for #{human_name(config)} shutdown -- #{time}"
   end
 
   def ack(task, state, retries \\ 0) do
@@ -164,7 +177,7 @@ defmodule Faktory.Stage.Worker do
 
     Process.cancel_timer(task.timer)
 
-    {errtype, message, trace} = Faktory.Error.down_reason_to_fail_info(reason)
+    {errtype, message, trace} = Faktory.Error.down_reason_to_fail_args(reason)
 
     case Faktory.Connection.fail(conn, task.job.jid, errtype, message, trace) do
       :ok -> log_fail(task, reason, state)

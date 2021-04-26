@@ -94,7 +94,7 @@ defmodule Faktory.Logger do
     %{job: job, worker: worker} = meta
     %{jid: jid, jobtype: jobtype, args: args} = job
     args = inspect(args, binaries: :as_strings, charlists: :as_lists)
-    name = worker_name(worker)
+    name = Faktory.Worker.human_name(worker)
     Logger.info "🚀 #{name} started jid-#{jid} (#{jobtype}) #{args}"
   end
 
@@ -102,7 +102,7 @@ defmodule Faktory.Logger do
     %{job: job, worker: worker} = meta
     %{jid: jid, jobtype: jobtype} = job
     time = Faktory.Utils.format_duration(usec)
-    name = worker_name(worker)
+    name = Faktory.Worker.human_name(worker)
     Logger.info "🥂 #{name} acked jid-#{jid} (#{jobtype}) in #{time}"
   end
 
@@ -110,7 +110,7 @@ defmodule Faktory.Logger do
     %{job: job, worker: worker} = meta
     %{jid: jid, jobtype: jobtype} = job
     time = Faktory.Utils.format_duration(usec)
-    name = worker_name(worker)
+    name = Faktory.Worker.human_name(worker)
     Logger.info "💥 #{name} failed jid-#{jid} (#{jobtype}) in #{time}"
   end
 
@@ -118,13 +118,11 @@ defmodule Faktory.Logger do
     %{job: job, worker: worker} = meta
     %{jid: jid, jobtype: jobtype} = job
     time = Faktory.Utils.format_duration(usec)
-    name = worker_name(worker)
+    name = Faktory.Worker.human_name(worker)
     Logger.info "⏱  #{name} timed out jid-#{jid} (#{jobtype}) in #{time}"
   end
 
   def log(_, _, _, _), do: nil
 
-  defp worker_name(%{name: module}) when is_atom(module), do: inspect(module)
-  defp worker_name(%{wid: wid}), do: wid
 
 end
