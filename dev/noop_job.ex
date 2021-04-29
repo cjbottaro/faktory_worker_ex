@@ -1,4 +1,5 @@
 defmodule Dev.NoopJob do
-  use Faktory.Job
+  @moduledoc false
+  use Faktory.Job, jobtype: "Foo"
   def perform, do: nil
 end

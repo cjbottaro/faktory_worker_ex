@@ -176,19 +176,10 @@ defmodule Faktory.Worker do
 
   """
   def start_link(config \\ []) do
-    # Pop this so it doesn't overwrite jobtype_map, we want to merge instead.
-    {jobtype_map, config} = Keyword.pop(config, :jobtype_map, [])
+    config = Faktory.Worker.merge_configs(config(), config)
 
-    # Merge argument with config.
-    config = Keyword.merge(config(), config)
-
-    # Merge jobtype_map.
-    config = Keyword.put(config, :jobtype_map,
-      Map.merge(config[:jobtype_map], Map.new(jobtype_map))
-    )
-
-    # The fetcher connection needs a wid. We can also use the wid to name our
-    # stages so they can talk to each other.
+    # The fetcher connection needs a wid. We also use the wid to name our stages
+    # so they can talk to each other.
     config = Keyword.put(config, :wid, Faktory.Utils.new_wid())
 
     # :name is a valid option, but we don't show it in config/0 or defaults/0.
@@ -232,6 +223,18 @@ defmodule Faktory.Worker do
   end
 
   @doc false
+  def merge_configs(c1, c2) do
+    if c2[:jobtype_map] do
+      jtm1 = c1[:jobtype_map] |> Map.new()
+      jtm2 = c2[:jobtype_map] |> Map.new()
+      Keyword.merge(c1, c2)
+      |> Keyword.put(:jobtype_map, Map.merge(jtm1, jtm2))
+    else
+      Keyword.merge(c1, c2)
+    end
+  end
+
+  @doc false
   def name(config) do
     config[:name] || {:global, {__MODULE__, Keyword.fetch!(config, :wid)}}
   end
@@ -244,75 +247,57 @@ defmodule Faktory.Worker do
     end
   end
 
-  defmacro __using__(options) do
+  defmacro __using__(config \\ []) do
     quote do
+      @config Keyword.put(unquote(config), :name, __MODULE__)
 
-      @otp_app unquote(options[:otp_app])
-      def otp_app, do: @otp_app
+      def config do
+        Faktory.Worker.merge_configs(
+          Faktory.Worker.config(),
+          @config
+        )
+      end
 
-      def init(config), do: config
-      defoverridable [init: 1]
+      def child_spec(config) do
+        config = Faktory.Worker.merge_configs(
+          config(),
+          config
+        )
 
-      def type, do: :worker
-      def client?, do: false
-      def worker?, do: true
-
-      def config, do: Faktory.Worker.config(__MODULE__)
-      def child_spec(options \\ []), do: Faktory.Worker.child_spec(__MODULE__, options)
-
+        %{
+          id: {Faktory.Worker, __MODULE__},
+          start: {
+            Faktory.Worker,
+            :start_link,
+            [config]
+          }
+        }
+      end
     end
   end
 
   @doc """
-  Callback for doing runtime configuration.
+  Worker module configuration.
 
   ```
-  defmodule MyFaktoryWorker do
-    use Faktory.Worker, otp_app: :my_app
-
-    def init(config) do
-      config
-      |> Keyword.put(:host, "foo.bar")
-      |> Keyword.merge(queues: ["default", "other_queue"], concurrency: 10)
-    end
+  defmodule MyWorker do
+    use Faktory.Worker, concurrency: 2
   end
+
+  config :my_app, MyWorker, queues: ["some-queue"]
+
+  iex(1)> MyWorker.config()
+  #{inspect Keyword.merge(@defaults, concurrency: 2, queues: ["some-queue"]), pretty: true, width: 0}
   ```
-  """
-  @callback init(config :: Keyword.t) :: Keyword.t
-
-  @doc """
-  Returns a worker's config after all runtime modifications have occurred.
-
-  ```elixir
-  iex(1)> MyFaktoryWorker.config
-  [
-    wid: "a2ba187ec640215f",
-    host: "localhost",
-    port: 7419,
-    middleware: [],
-    concurrency: 20,
-    queues: ["default"],
-    password: nil,
-    use_tls: false,
-    reporter_count: 1,
-    shutdown_grace_period: 25_000,
-  ]
-  ```
-
-  Don't mess with the `wid`. 🤨
   """
   @callback config :: Keyword.t
 
-  @doc false
-  def config(module) do
-    Faktory.Configuration.call(module, @defaults)
-  end
+  def child_spec(config) do
+    config = merge_configs(config(), config)
 
-  def child_spec(module, _options) do
     %{
-      id: module,
-      start: {Faktory.Supervisor, :start_link, [module]},
-      type: :supervisor
+      id: {__MODULE__, Faktory.Utils.new_wid()}, # The id doesn't matter; it might as well be random.
+      start: {__MODULE__, :start_link, [config]}
     }
   end
 end

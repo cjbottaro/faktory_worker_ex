@@ -3,9 +3,11 @@ defmodule Faktory.Application do
   use Application
 
   def start(_type, _args) do
-    :ok = Faktory.Logger.init()
+    :ok = Faktory.Logger.Socket.init()
+    :ok = Faktory.Logger.Connection.init()
+    :ok = Faktory.Logger.Command.init()
+    :ok = Faktory.Logger.Job.init()
 
-    children = []
-    Supervisor.start_link(children, strategy: :one_for_one)
+    Supervisor.start_link([], strategy: :one_for_one)
   end
 end

@@ -19,6 +19,19 @@ defmodule Faktory.Client do
   {:ok, job} = MyJob.perform_async([1, 2])
   ```
 
+  ## Default configuration
+
+  You can override the [default options](`defaults/0`) that are sent to `start_link/1` using `Config`.
+
+  ```
+  config :faktory_worker_ex, Faktory.Client,
+    host: "faktory.myapp.com",
+    pool_size: 2,
+    lazy: false
+  ```
+
+  These will be merged with `defaults/0` and can be seen with `config/0`.
+
   ## Using as a module
 
   This is nice so you don't have to constantly pass around a pid or name.
@@ -35,18 +48,12 @@ defmodule Faktory.Client do
 
   The keyword list argument to `use` will be passed to `start_link/1`.
 
-  ## Default configuration
-
-  You can override the default options that are sent to `start_link/1` using `Config`.
-
+  You can specifically configure your client modules.
   ```
-  config :faktory_worker_ex, Faktory.Client,
-    host: "faktory.myapp.com",
-    pool_size: 2,
-    lazy: false
+  config :my_app, MyClient, host: "foo.bar.com"
   ```
 
-  These will be merged with `defaults/0` and can be seen with `config/0`.
+  Module specific configuration will be merged with `use` arguments and also `config/0`.
 
   """
   @behaviour NimblePool
@@ -130,6 +137,15 @@ defmodule Faktory.Client do
     |> NimblePool.start_link()
   end
 
+  def child_spec(config) do
+    config = Keyword.merge(config(), config)
+
+    %{
+      id: config[:name] || raise(":name is required"),
+      start: {__MODULE__, :start_link, [config]}
+    }
+  end
+
   @doc """
   Get a connection from the pool.
 
@@ -189,16 +205,40 @@ defmodule Faktory.Client do
     with_conn(client, fn conn -> Faktory.Connection.mutate(conn, mutation) end)
   end
 
-  # def fetch(client, queues, opts \\ []) do
-  #   with_conn(client, fn conn -> Faktory.Connection.fetch(conn, queues, opts) end)
-  # end
+  defmacro __using__(config \\ []) do
+    base = __MODULE__
 
-  # def ack(client, jid) do
-  #   with_conn(client, fn conn -> Faktory.Connection.ack(conn, jid) end)
-  # end
+    quote do
+      @base unquote(base)
+      @config unquote(config)
 
-  # def fail(client, jid, errtype, message, backtrace \\ []) do
-  #   with_conn(client, fn conn -> Faktory.Connection.fail(conn, jid, errtype, message, backtrace) end)
-  # end
+      def config do
+        config = Application.get_application(__MODULE__)
+        |> Application.get_env(__MODULE__, [])
+
+        @base.config()
+        |> Keyword.merge(@config)
+        |> Keyword.merge(config)
+      end
+
+      def child_spec(config) do
+        config = Keyword.merge(config(), config)
+        |> Keyword.put(:name, __MODULE__)
+
+        @base.child_spec(config)
+      end
+
+      def start_link(config \\ []) do
+        Keyword.merge(config(), config)
+        |> Keyword.put(:name, __MODULE__)
+        |> @base.start_link()
+      end
+
+      def with_conn(f), do: @base.with_conn(__MODULE__, f)
+      def info(), do: @base.info(__MODULE__)
+      def push(opts \\ [], job), do: @base.push(__MODULE__, opts, job)
+      def flush(), do: @base.flush(__MODULE__)
+    end
+  end
 
 end

@@ -155,7 +155,7 @@ defmodule Faktory.Stage.Worker do
     Logger.info "Worker stage for #{human_name(config)} shutdown -- #{time}"
   end
 
-  def ack(task, state, retries \\ 0) do
+  defp ack(task, state, retries \\ 0) do
     %{conn: conn} = state
 
     Process.cancel_timer(task.timer)
@@ -172,7 +172,7 @@ defmodule Faktory.Stage.Worker do
     end
   end
 
-  def fail(task, reason, state, retries \\ 0) do
+  defp fail(task, reason, state, retries \\ 0) do
     %{conn: conn} = state
 
     Process.cancel_timer(task.timer)
@@ -191,7 +191,7 @@ defmodule Faktory.Stage.Worker do
     end
   end
 
-  def log_start(job, state) do
+  defp log_start(job, state) do
     :telemetry.execute(
       [:faktory, :job, :start],
       %{},
@@ -199,7 +199,7 @@ defmodule Faktory.Stage.Worker do
     )
   end
 
-  def log_ack(task, state) do
+  defp log_ack(task, state) do
     :telemetry.execute(
       [:faktory, :job, :ack],
       %{usec: elapsed(task.start_at)},
@@ -207,7 +207,7 @@ defmodule Faktory.Stage.Worker do
     )
   end
 
-  def log_fail(task, reason, state) do
+  defp log_fail(task, reason, state) do
     :telemetry.execute(
       [:faktory, :job, :fail],
       %{usec: elapsed(task.start_at)},
@@ -215,7 +215,7 @@ defmodule Faktory.Stage.Worker do
     )
   end
 
-  def log_reservation_expired(task, state) do
+  defp log_reservation_expired(task, state) do
     :telemetry.execute(
       [:faktory, :job, :timeout],
       %{usec: elapsed(task.start_at)},

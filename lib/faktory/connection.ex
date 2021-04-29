@@ -437,7 +437,7 @@ defmodule Faktory.Connection do
       end
 
       :telemetry.execute(
-        [:faktory, :connection, :call, call],
+        [:faktory, :command, call],
         %{usec: System.monotonic_time(:microsecond) - at},
         %{result: result}
       )

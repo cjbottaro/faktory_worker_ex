@@ -24,11 +24,12 @@ defmodule Faktory.Mixfile do
       # Docs
       docs: [
         extras: [
-          "README.md": [title: "README", name: "readme"],
           "CHANGELOG.md": [title: "CHANGELOG"],
-          "Architecture.md": [title: "Architecture"],
         ],
-        main: "readme",
+        main: "Faktory",
+        groups_for_modules: [
+          "Logging": [~r/Faktory\.Logger\.\w+/],
+        ],
       ],
 
       xref: [exclude: IEx]
