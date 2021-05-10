@@ -2,7 +2,7 @@ defmodule Faktory.Worker do
   @moduledoc """
   Create and configure a worker for _processing_ jobs.
 
-  It works exatly the same as configuring an Ecto Repo.
+  It works exactly the same as configuring an Ecto Repo.
 
   ```elixir
   defmodule MyFaktoryWorker do
@@ -49,6 +49,13 @@ defmodule Faktory.Worker do
     host: {:system, "FAKTORY_HOST"} # No default, errors if FAKTORY_HOST doesn't exist
     port: {:system, "FAKTORY_PORT", 1001} # Use 1001 if FAKTORY_PORT doesn't exist
   ```
+
+  ## Shutdown grace period
+
+  The `:shutdown_grace_period` config option specifies how long to wait for any currently
+  running jobs to finish after receiving instruction to shutdown. For example from
+  receiving a SIGTERM, or from the Faktory server issuing a `terminate` command
+  (clicking the stop button in the web UI).
   """
 
   @defaults [
@@ -59,8 +66,8 @@ defmodule Faktory.Worker do
     queues: ["default"],
     password: nil,
     use_tls: false,
-    fetcher_count: 1,
-    reporter_count: 1
+    reporter_count: 1,
+    shutdown_grace_period: 25_000
   ]
 
   @doc """
@@ -76,8 +83,8 @@ defmodule Faktory.Worker do
     queues: ["default"],
     password: nil,
     use_tls: false,
-    fetcher_count: 1,
-    reporter_count: 1
+    reporter_count: 1,
+    shutdown_grace_period: 25_000,
   ]
   ```
   """
@@ -133,8 +140,8 @@ defmodule Faktory.Worker do
     queues: ["default"],
     password: nil,
     use_tls: false,
-    fetcher_count: 1,
-    reporter_count: 1
+    reporter_count: 1,
+    shutdown_grace_period: 25_000,
   ]
   ```
 
@@ -147,20 +154,7 @@ defmodule Faktory.Worker do
     Faktory.Configuration.call(module, @defaults)
   end
 
-  @doc false
-  def child_spec(module, options) do
-    child_spec(module, options, Faktory.start_workers?)
-  end
-
-  @doc false
-  def child_spec(module, _options, false) do
-    %{
-      id: module,
-      start: {Task, :start_link, [fn -> Process.sleep(:infinity) end]}
-    }
-  end
-
-  def child_spec(module, _options, true) do
+  def child_spec(module, _options) do
     %{
       id: module,
       start: {Faktory.Supervisor, :start_link, [module]},

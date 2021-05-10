@@ -1,7 +1,7 @@
 defmodule Faktory.Mixfile do
   use Mix.Project
 
-  @version "0.7.0"
+  @version "1.0.0"
 
   def project do
     [
@@ -29,7 +29,9 @@ defmodule Faktory.Mixfile do
           "Architecture.md": [title: "Architecture"],
         ],
         main: "readme",
-      ]
+      ],
+
+      xref: [exclude: IEx]
     ]
   end
 
@@ -48,7 +50,7 @@ defmodule Faktory.Mixfile do
       {:jason, "~> 1.1"},
       {:poolboy, "~> 1.5"},
       {:socket, "~> 0.3"},
-      {:gen_stage, "~> 0.14"},
+      {:gen_stage, "~> 1.0"},
       {:ex_doc, "~> 0.19", only: :dev},
       {:mox, "~> 0.3", only: :test},
     ]
@@ -58,13 +60,17 @@ defmodule Faktory.Mixfile do
     ["lib", "test/support"]
   end
 
+  defp elixirc_paths(:dev) do
+    ["lib", "dev"]
+  end
+
   defp elixirc_paths(_) do
     ["lib"]
   end
 
   defp aliases do
     [
-      # compile: ["compile --warnings-as-errors"]
+      compile: ["compile --warnings-as-errors"]
     ]
   end
 end

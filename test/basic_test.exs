@@ -1,8 +1,9 @@
 defmodule BasicTest do
   use ExUnit.Case, async: false
 
+  @tag :focus
   test "enqueing and processing a job" do
-    job = AddWorker.perform_async([PidMap.register, 1, 2])
+    {:ok, job} = AddWorker.perform_async([PidMap.register, 1, 2])
     jid = job["jid"]
 
     assert_receive %{jid: ^jid, error: nil}
@@ -22,7 +23,7 @@ defmodule BasicTest do
   end
 
   test "worker handles exceptions" do
-    job = AddWorker.perform_async([PidMap.register, 1, "foo"])
+    {:ok, job} = AddWorker.perform_async([PidMap.register, 1, "foo"])
     jid = job["jid"]
 
     assert_receive %{jid: ^jid, error: error}
@@ -30,7 +31,7 @@ defmodule BasicTest do
   end
 
   test "worker handles executor dying from brutal kill" do
-    job = DieWorker.perform_async([:kill])
+    {:ok, job} = DieWorker.perform_async([:kill])
     jid = job["jid"]
 
     assert_receive %{jid: ^jid, error: error}
@@ -39,11 +40,36 @@ defmodule BasicTest do
   end
 
   test "worker handles executor dying from linked process" do
-    job = DieWorker.perform_async([:spawn])
+    {:ok, job} = DieWorker.perform_async([:spawn])
     jid = job["jid"]
 
     assert_receive %{jid: ^jid, error: error}
     assert error.errtype == "UndefinedFunctionError"
+  end
+
+  test ":client option on job" do
+    assert CustomClientJob.faktory_options[:client] == CustomClient
+  end
+
+  test "mutate scheduled -> dead" do
+    {:ok, info} = Test.Client.info()
+    assert info["faktory"]["tasks"]["Scheduled"]["size"] == 0
+    assert info["faktory"]["tasks"]["Dead"]["size"] == 0
+
+    at = DateTime.utc_now()
+    |> DateTime.add(60)
+
+    {:ok, _job} = AddWorker.perform_async([PidMap.register, 1, 2], at: at)
+
+    {:ok, info} = Test.Client.info()
+    assert info["faktory"]["tasks"]["Scheduled"]["size"] == 1
+    assert info["faktory"]["tasks"]["Dead"]["size"] == 0
+
+    :ok = Test.Client.mutate(%{cmd: "kill", target: "scheduled", filter: %{jobtype: "AddWorker"}})
+
+    {:ok, info} = Test.Client.info()
+    assert info["faktory"]["tasks"]["Scheduled"]["size"] == 0
+    assert info["faktory"]["tasks"]["Dead"]["size"] == 1
   end
 
 end

@@ -9,36 +9,24 @@ defmodule Faktory.Supervisor do
   end
 
   def init(config) do
-    heartbeat = %{
-      id: {config.module, :heartbeat},
-      start: {Faktory.Heartbeat, :start_link, [config]}
-    }
-
-    # TODO make the count configurable
-    fetchers = Enum.map 1..config.fetcher_count, fn index ->
-      %{
-        id: {config.module, Faktory.Fetcher, index},
-        start: {Faktory.Fetcher, :start_link, [config, index]}
-      }
+    if start?(config) do
+      [
+        {Faktory.Manager, config},
+        {Faktory.Stage.Fetcher, config},
+        {Faktory.Stage.Worker, config}
+      ]
+    else
+      []
     end
+    |> Supervisor.init(strategy: :one_for_one)
+  end
 
-    runners = Enum.map 1..config.concurrency, fn index ->
-      %{
-        id: {config.module, Faktory.Runner, index},
-        start: {Faktory.Runner, :start_link, [config, index]}
-      }
+  defp start?(config) do
+    if Map.has_key?(config, :start) do
+      config.start
+    else
+      Faktory.start_workers?
     end
-
-    # TODO make the count configurable
-    reporters = Enum.map 1..config.reporter_count, fn index ->
-      %{
-        id: {config.module, Faktory.Reporter, index},
-        start: {Faktory.Reporter, :start_link, [config, index]}
-      }
-    end
-
-    children = [heartbeat | fetchers ++ runners ++ reporters]
-    Supervisor.init(children, strategy: :one_for_one)
   end
 
 end

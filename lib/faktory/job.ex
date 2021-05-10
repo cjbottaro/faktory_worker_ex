@@ -26,15 +26,19 @@ defmodule Faktory.Job do
   ### Configuring
 
   You can configure various aspects of the job by passing a keyword list to
-  `faktory_options/1`.
+  `use Faktory.Job` or `faktory_options/1`. They are both functionally the
+  same and it's mostly an issue of style.
 
   ```elixir
   defmodule MyFunkyJob do
+    use Faktory.Job, queue: "default", retry: 25, backtrace: 0
+  end
+
+  # These are equivalent.
+
+  defmodule MyFunkyJob do
     use Faktory.Job
-
     faktory_options queue: "default", retry: 25, backtrace: 0
-
-    # ...
   end
   ```
 
@@ -50,21 +54,37 @@ defmodule Faktory.Job do
   ```
   """
 
-  defmacro __using__(_options) do
+  @defaults [
+    queue: "default",
+    retry: 25,
+    backtrace: 0,
+    middleware: [],
+    reserve_for: 1800
+  ]
+
+  @doc """
+  Returns the default job configuration.
+
+  ```elixir
+  iex(1)> Faktory.Job.defaults
+  #{inspect @defaults}
+  ```
+  """
+  def defaults do
+    @defaults
+  end
+
+  defmacro __using__(options) do
     quote do
       @behaviour Faktory.Job
       import Faktory.Job, only: [faktory_options: 1]
-      @faktory_options [
-        queue: "default",
-        jobtype: Faktory.Utils.module_name(__MODULE__),
-        retry: 25,
-        backtrace: 0,
-        middleware: []
-      ]
+      @faktory_options Keyword.merge(Faktory.Job.defaults, jobtype: inspect(__MODULE__))
       @before_compile Faktory.Job
 
+      faktory_options(unquote(options))
+
       def perform_async(args, options \\ []) do
-        Faktory.push(__MODULE__, args, options)
+        Faktory.Job.perform_async(@faktory_options, args, options)
       end
 
     end
@@ -90,7 +110,8 @@ defmodule Faktory.Job do
     jobtype: "MyFunkyJob",
     retry: 25,
     middleware: [],
-    backtrace: 10
+    backtrace: 10,
+    client: nil
   ]
   ```
   """
@@ -109,7 +130,7 @@ defmodule Faktory.Job do
   MyJob.perform_async(job_args, queue: "not_default" jobtype: "Worker::MyJob")
   ```
   """
-  @callback perform_async(args :: [any], options :: Keyword.t | []) :: job
+  @callback perform_async(args :: [any], options :: Keyword.t | []) :: {:ok, job} | {:error, reason :: binary}
 
   @doc """
   Set default options for all jobs of this type.
@@ -122,6 +143,22 @@ defmodule Faktory.Job do
       options = unquote(options)
       @faktory_options Keyword.merge(@faktory_options, options)
     end
+  end
+
+  def perform_async(faktory_options, args, options) do
+    options = Keyword.merge(faktory_options, options)
+    job = %{
+      "jobtype" => options[:jobtype],
+      "args" => args,
+      "queue" => options[:queue],
+      "reserve_for" => options[:reserve_for],
+      "at" => options[:at],
+      "retry" => options[:retry],
+      "backtrace" => options[:backtrace]
+    }
+
+    client = options[:client] || Faktory.default_client() || raise("No default client configured")
+    client.push(job, options)
   end
 
 end

@@ -1,4 +1,6 @@
-use Mix.Config
+import Config
+
+config :faktory_worker_ex, :test, true
 
 config :faktory_worker_ex, Test.Client,
   port: 7421,

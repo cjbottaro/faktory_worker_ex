@@ -1,17 +1,8 @@
 defmodule Faktory.Utils do
   @moduledoc false
 
-  # Retain this at compile time since Mix.* will not be available in release builds
-  @app_name Mix.Project.config[:app]
-
-  def app_name, do: @app_name
-
-  def module_name(string) when is_binary(string) do
-    String.replace_prefix(string, "Elixir.", "")
-  end
-
-  def module_name(module) when is_atom(module) do
-    module |> Module.split |> Enum.join(".")
+  def blank?(value) do
+    (value |> to_string() |> String.trim()) == ""
   end
 
   # This will convert an enum into a map with string keys.
@@ -49,16 +40,11 @@ defmodule Faktory.Utils do
     :os.system_time(:milli_seconds)
   end
 
-  def env do
-    cond do
-      function_exported?(Mix, :env, 1) -> Mix.env
-      Application.get_env(@app_name, :env) -> Application.get_env(@app_name, :env)
-      Map.has_key?(System.get_env, "MIX_ENV") -> System.get_env("MIX_ENV")
-      true -> :dev
-    end
+  def elapsed(start_time) do
+    (System.monotonic_time(:millisecond) - start_time) / 1000
   end
 
-  def hash_password(iterations, password, salt) do
+  def hash_password(password, salt, iterations) do
     1..iterations
     |> Enum.reduce(password <> salt, fn(_i, acc) ->
       :crypto.hash(:sha256, acc)
@@ -68,7 +54,7 @@ defmodule Faktory.Utils do
   end
 
   defmacro if_test(do: block) do
-    if Faktory.Utils.env == :test do
+    if Faktory.get_env(:test) do
       quote do: unquote(block)
     end
   end
@@ -89,6 +75,10 @@ defmodule Faktory.Utils do
     else
       time
     end
+  end
+
+  def args_to_string(args) do
+    inspect(args, binaries: :as_strings, charlists: :as_lists)
   end
 
 end

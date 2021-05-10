@@ -1,7 +1,10 @@
 defmodule Faktory.Error do
   @moduledoc false
 
-  defmodule InvalidJobType, do: defexception [:message]
+  defmodule InvalidJobType do
+    @moduledoc false
+    defexception [:message]
+  end
 
   defstruct [:errtype, :message, trace: []]
 

@@ -58,13 +58,9 @@ You should see logging output and the above job being processed.
 
 To see command line options that can override in-app configuration.
 
-`iex -S mix faktory`
-
-If you want to debug your jobs using `IEx.pry`.
-
 ## Configuration
 
-Compile-time config is done with `Mix.Config`.
+Compile-time config is done with `Config`.
 
 Run-time config is done with environment variables and/or an `init/1` callback.
 
@@ -83,20 +79,66 @@ docker run --rm -p 7419:7419 -p 7420:7420 contribsys/faktory:latest -b :7419 -w 
 
 You should be able to go to [http://localhost:7420](http://localhost:7420) and see the web ui.
 
+## Using with releases
+
+There is basic support for releases that were introduced in Elixir 1.9.
+
+There are two ways to start up the workers when using releases:
+
+1. Setting an environment variable:
+```
+START_FAKTORY_WORKERS=1
+```
+2. Using `config/release.exs`:
+```
+config :faktory_worker_ex, :start_workers, true
+```
+
+There is no support for command line arguments when using releases.
+
+## Using with multiple Faktory servers
+
+```elixir
+import Config
+
+config :my_app, FooClient,
+  host: "foo.faktory.myapp.com"
+
+config :my_app, BarClient,
+  host: "bar.faktory.myapp.com"
+
+defmodule FooClient do
+  use Faktory.Client, otp_app: :my_app
+end
+
+defmodule BarClient do
+  use Faktory.Client, otp_app: :my_app
+end
+
+defmodule FooJob do
+  use Faktory.Job, client: FooClient
+  def perform(), do: nil
+end
+
+defmodule BarJob do
+  use Faktory.Job, client: BarClient
+  def perform(), do: nil
+end
+
+FooJob.perform_async([]) # Enqueues job to Faktory server at foo.faktory.myapp.com
+BarJob.perform_async([]) # Enqueues job to Faktory server at bar.faktory.myapp.com
+```
+
 ## Features
 
 * Middleware
 * Connection pooling (for clients)
 * Support for multiple Faktory servers
 * Faktory server authentication and TLS support
+* Elixir 1.9 release support
 * Comprehensive documentation
 * Comprehensive supervision tree
 * Decent integration tests
-
-## Missing features
-
-* Responding to `quiet` and `terminate`
-* Running without `mix` (e.g. a Distillery release)
 
 ## Issues / Questions
 

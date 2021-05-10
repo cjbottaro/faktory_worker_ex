@@ -24,13 +24,34 @@ defmodule Faktory.Configuration do
   defp jobtype_map(otp_app) do
     {:ok, modules} = :application.get_key(otp_app, :modules)
     Enum.reduce(modules, %{}, fn module, acc ->
-      behaviours = module.__info__(:attributes)[:behaviour] || []
-      if Faktory.Job in behaviours do
+      if Faktory.Job in get_behaviours(module) do
         Map.put(acc, module.faktory_options[:jobtype], module)
       else
         acc
       end
     end)
+  end
+
+  # Apparently sometimes module.__info__/1 is not defined.
+  # This code was ganked from this PR, which has an explanation:
+  # https://github.com/cjbottaro/faktory_worker_ex/pull/55
+  defp get_behaviours(module) do
+
+    # Trying to call a function on a module will implicitly load it, but
+    # function_exported?/1 will return false on unloaded modules, so we
+    # have to make sure the module is loaded before calling it.
+    {:module, ^module} = Code.ensure_loaded(module)
+
+    cond do
+      Kernel.function_exported?(module, :__info__, 1) ->
+        module.__info__(:attributes)[:behaviour] || []
+
+      Kernel.function_exported?(module, :module_info, 1) ->
+        module.module_info(:attributes)[:behaviour] || []
+
+      true ->
+        []
+    end
   end
 
   defp put_wid(config, :worker), do: Keyword.put(config, :wid, Faktory.Utils.new_wid)

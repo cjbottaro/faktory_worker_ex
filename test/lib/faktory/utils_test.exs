@@ -8,7 +8,7 @@ defmodule Faktory.UtilsTest do
       salt = "55104dc76695721d"
 
       expected = "6d877f8e5544b1f2598768f817413ab8a357afffa924dedae99eb91472d4ec30"
-      actual = Faktory.Utils.hash_password(iterations, password, salt)
+      actual = Faktory.Utils.hash_password(password, salt, iterations)
 
       assert expected == actual
     end
