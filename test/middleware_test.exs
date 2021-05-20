@@ -43,7 +43,7 @@ defmodule TestMiddlewareC do
   end
 end
 
-defmodule Faktory.MiddlewareTest do
+defmodule MiddlewareTest do
   use ExUnit.Case, async: true
 
   test "basically works" do

@@ -1,4 +1,4 @@
-defmodule Faktory.UtilsTest do
+defmodule UtilsTest do
   use ExUnit.Case, async: true
 
   describe "hash_password/3" do
