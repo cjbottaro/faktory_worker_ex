@@ -53,12 +53,6 @@ defmodule Faktory.Utils do
     |> String.downcase()
   end
 
-  defmacro if_test(do: block) do
-    if Faktory.get_env(:test) do
-      quote do: unquote(block)
-    end
-  end
-
   def unix_pid do
     System.get_pid |> String.to_integer
   end

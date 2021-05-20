@@ -70,16 +70,15 @@ defmodule Faktory.Worker do
 
   ## Starting
 
-  By default (`:start` option is `nil`), workers look at
-  `Application.get_env(:faktory_worker_ex, :start_via_mix, false)` to determine if
-  they should start up or not, which is set to true by `mix faktory`.
+  Once a worker is put in your application's supervision tree, you can start up
+  it up by running `mix faktory`.
 
-  That means all you have to do is put your worker in your supervision tree,
-  then run `mix faktory` to start it up.
+  You can override this behavior by setting the worker option `:start` to either
+  `true` or `false`. This gives you fine grain control over which workers are
+  started and when, for example in a large umbrella app.
 
-  You can override this by setting `:start` to either `true` or `false` for your
-  worker. This gives you fine grain control over which workers to start (for
-  example in an umbrella app).
+  The default for `:start` is `nil` which means use `mix faktory` to start
+  worker.
   """
 
   @defaults [
@@ -199,7 +198,7 @@ defmodule Faktory.Worker do
     end
 
     start = case config[:start] do
-      nil -> Application.get_env(:faktory_worker_ex, :start_via_mix, false)
+      nil -> Application.get_env(:faktory_worker_ex, :start_workers, false)
       start -> start
     end
 
@@ -259,10 +258,7 @@ defmodule Faktory.Worker do
       end
 
       def child_spec(config) do
-        config = Faktory.Worker.merge_configs(
-          config(),
-          config
-        )
+        config = Faktory.Worker.merge_configs(config(), config)
 
         %{
           id: {Faktory.Worker, __MODULE__},
@@ -272,6 +268,11 @@ defmodule Faktory.Worker do
             [config]
           }
         }
+      end
+
+      def start_link(config \\ []) do
+        config = Faktory.Worker.merge_configs(config(), config)
+        Faktory.Worker.start_link(config)
       end
     end
   end

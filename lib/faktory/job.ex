@@ -202,7 +202,7 @@ defmodule Faktory.Job do
       {nil, _options} -> {:error, ":client is required"}
       {client, options} ->
         job = Keyword.put(options, :args, args) |> new()
-        Faktory.Client.push(client, job, options)
+        Faktory.Client.push(client, options, job)
     end
   end
 

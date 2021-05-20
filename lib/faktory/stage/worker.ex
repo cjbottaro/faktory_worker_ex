@@ -27,6 +27,8 @@ defmodule Faktory.Stage.Worker do
     Process.flag(:trap_exit, true) # For graceful shutdown.
     Logger.info "Worker stage for #{human_name(config)} starting up -- #{config[:concurrency]}"
 
+    config = update_in(config[:middleware], &List.wrap/1)
+
     {:ok, conn} = Keyword.drop(config, [:wid, :name])
     |> Faktory.Connection.start_link()
 
@@ -61,7 +63,7 @@ defmodule Faktory.Stage.Worker do
 
     task = Task.async(fn ->
       Faktory.Middleware.traverse(job, middleware, fn job ->
-        module = jobtype_map[ job.jobtype ]
+        module = jobtype_map[job.jobtype]
         module || raise(Faktory.Error.InvalidJobType, message: job.jobtype)
         log_start(job, state)
         apply(module, :perform, job.args)
@@ -77,7 +79,7 @@ defmodule Faktory.Stage.Worker do
     {:noreply, [], %{state | tasks: tasks}}
   end
 
-  def handle_info({ref, _value}, state) when is_map_key(state.tasks, ref) do
+  def handle_info({ref, value}, state) when is_map_key(state.tasks, ref) do
     %{tasks: tasks, producer: producer} = state
 
     # Stop :DOWN message from being sent. According to the docs, this is very
@@ -86,7 +88,7 @@ defmodule Faktory.Stage.Worker do
 
     {task, tasks} = Map.pop!(tasks, ref)
 
-    ack(task, state)
+    ack(task, value, state)
     :ok = GenStage.ask(producer, 1)
 
     {:noreply, [], %{state | tasks: tasks}}
@@ -141,10 +143,10 @@ defmodule Faktory.Stage.Worker do
     Map.values(tasks)
     |> Task.yield_many(config.shutdown - 1_000)
     |> Enum.each(fn
-      {task, {:ok, _value}} -> ack(state, task)
-      {task, {:exit, error}} -> fail(state, task, error)
+      {task, {:ok, value}} -> ack(task, value, state)
+      {task, {:exit, error}} -> fail(task, error, state)
       {task, nil} -> case Task.shutdown(task, :brutal_kill) do
-        {:ok, _value} -> ack(task, state)
+        {:ok, value} -> ack(task, value, state)
         {:exit, reason} -> fail(task, reason, state)
         nil -> fail(task, reason, state)
       end
@@ -155,13 +157,13 @@ defmodule Faktory.Stage.Worker do
     Logger.info "Worker stage for #{human_name(config)} shutdown -- #{time}"
   end
 
-  defp ack(task, state, retries \\ 0) do
+  defp ack(task, value, state, retries \\ 0) do
     %{conn: conn} = state
 
     Process.cancel_timer(task.timer)
 
     case Faktory.Connection.ack(conn, task.job.jid) do
-      :ok -> log_ack(task, state)
+      :ok -> log_ack(task, value, state)
 
       {:error, _reason} ->
         Process.send_after(
@@ -199,11 +201,11 @@ defmodule Faktory.Stage.Worker do
     )
   end
 
-  defp log_ack(task, state) do
+  defp log_ack(task, value, state) do
     :telemetry.execute(
       [:faktory, :job, :ack],
       %{usec: elapsed(task.start_at)},
-      %{job: task.job, worker: state.config}
+      %{job: task.job, worker: state.config, value: value}
     )
   end
 
