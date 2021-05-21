@@ -389,7 +389,9 @@ defmodule Faktory.Connection do
     {:connect, :backoff, state}
   end
 
-  def handle_info({transport, socket, line}, state) when transport in [:tcp, :ssl] and state.socket == socket do
+  def handle_info({transport, _socket, line}, state) when transport in [:tcp, :ssl] do
+    %{socket: socket} = state
+
     {{from, at, call}, state} = pop_call(state)
 
     :telemetry.execute(
@@ -447,7 +449,7 @@ defmodule Faktory.Connection do
     end
   end
 
-  def handle_info({reason, socket}, state) when reason in [:tcp_closed, :ssl_closed] and state.socket == socket do
+  def handle_info({reason, _socket}, state) when reason in [:tcp_closed, :ssl_closed] do
     {:disconnect, reason, state}
   end
 
@@ -582,8 +584,15 @@ defmodule Faktory.Connection do
   defp connect_and_handshake(state) do
     %{host: host, port: port, tls: tls} = state.config
 
-    opts = [:binary, active: false, packet: :line, tls: tls]
-    with {:ok, socket} <- Socket.connect(host, port, opts),
+    opts = [:binary, active: false, packet: :line]
+
+    {socket, opts} = case tls do
+      false -> {Socket.Tcp, opts}
+      true -> {Socket.Ssl, opts}
+      ssl_opts -> {Socket.Ssl, opts ++ ssl_opts}
+    end
+
+    with {:ok, socket} <- socket.connect(host, port, opts),
       {:ok, <<"HI", greeting::binary>>} <- Resp.recv(socket),
       {:ok, greeting} <- Jason.decode(greeting),
       hello = Protocol.hello(greeting, state.config),
