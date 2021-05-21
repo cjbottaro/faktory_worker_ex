@@ -1,5 +1,5 @@
 defmodule DieJob do
-  use Faktory.Job, client: Test.Client
+  use Faktory.Job
 
   def perform(die) do
     case die do

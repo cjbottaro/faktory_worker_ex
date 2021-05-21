@@ -594,6 +594,7 @@ defmodule Faktory.Connection do
       {:ok, socket, greeting}
     else
       {:ok, {:error, reason}} -> {:error, reason}
+      error -> error
     end
   end
 

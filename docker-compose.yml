@@ -7,7 +7,7 @@ services:
     command: ./faktory -b :7419 -w :7420 -l debug
     ports:
       - "7519:7419"
-      - "7420:7420"
+      - "7520:7420"
 
   test:
     image: contribsys/faktory:1.5.1
