@@ -85,6 +85,8 @@ defmodule Faktory.Middleware do
   @doc false
   # This hurts my brain.
   def traverse(job, chain, done_fn) do
+    chain = List.wrap(chain)
+
     walker = fn
       job, [], _next ->
         done_fn.(job)

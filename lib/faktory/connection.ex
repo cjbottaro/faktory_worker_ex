@@ -227,8 +227,8 @@ defmodule Faktory.Connection do
   "queue-two"
   ```
   """
-  @spec push(t, Keyword.t, Faktory.push_job) :: {:ok, Faktory.push_job} | {:error, term}
-  def push(conn, _opts \\ [], job) do
+  @spec push(t, Faktory.push_job) :: {:ok, Faktory.push_job} | {:error, term}
+  def push(conn, job) do
     job = Faktory.Job.new(job)
     case Connection.call(conn, {:push, job}) do
       :ok -> {:ok, job}

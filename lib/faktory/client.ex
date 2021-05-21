@@ -66,7 +66,7 @@ defmodule Faktory.Client do
 
   @impl NimblePool
   def handle_checkout(:checkout, _from, conn, config) do
-    {:ok, conn, conn, config}
+    {:ok, {conn, config}, conn, config}
   end
 
   @type t :: GenServer.server()
@@ -74,6 +74,7 @@ defmodule Faktory.Client do
   @defaults [
     pool_size: 5,
     lazy: true,
+    middleware: [],
   ]
   @doc """
   Default configuration.
@@ -160,8 +161,8 @@ defmodule Faktory.Client do
   """
   @spec with_conn(t, (Faktory.Connection.t -> any)) :: any
   def with_conn(client, f) do
-    NimblePool.checkout!(client, :checkout, fn _, conn ->
-      {f.(conn), conn}
+    NimblePool.checkout!(client, :checkout, fn _, {conn, config} ->
+      {f.(conn, config), conn}
     end)
   end
 
@@ -172,7 +173,7 @@ defmodule Faktory.Client do
   """
   @spec info(t) :: {:ok, map} | {:error, term}
   def info(client) do
-    with_conn(client, fn conn -> Faktory.Connection.info(conn) end)
+    with_conn(client, fn conn, _config -> Faktory.Connection.info(conn) end)
   end
 
   @doc """
@@ -182,11 +183,11 @@ defmodule Faktory.Client do
   """
   @spec push(t, Faktory.push_job, Keyword.t) :: {:ok, Faktory.push_job} | {:error, term}
   def push(client, opts \\ [], job) do
-    middleware = opts[:middleware]
-    |> List.wrap()
-
-    Faktory.Middleware.traverse(job, middleware, fn job ->
-      with_conn(client, fn conn -> Faktory.Connection.push(conn, opts, job) end)
+    with_conn(client, fn conn, config ->
+      middleware = opts[:middleware] || config[:middleware]
+      Faktory.Middleware.traverse(job, middleware, fn job ->
+        Faktory.Connection.push(conn, job)
+      end)
     end)
   end
 
@@ -197,7 +198,7 @@ defmodule Faktory.Client do
   """
   @spec flush(t) :: :ok | {:error, term}
   def flush(client) do
-    with_conn(client, fn conn -> Faktory.Connection.flush(conn) end)
+    with_conn(client, fn conn, _config -> Faktory.Connection.flush(conn) end)
   end
 
   @doc """
@@ -207,7 +208,7 @@ defmodule Faktory.Client do
   """
   @spec mutate(t, Keyword.t | map) :: :ok | {:error, term}
   def mutate(client, mutation) do
-    with_conn(client, fn conn -> Faktory.Connection.mutate(conn, mutation) end)
+    with_conn(client, fn conn, _config -> Faktory.Connection.mutate(conn, mutation) end)
   end
 
   defmacro __using__(config \\ []) do
