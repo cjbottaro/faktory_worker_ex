@@ -1,4 +1,5 @@
 defmodule Faktory.Socket.Tcp do
+  @moduledoc false
   defstruct [:socket]
 
   def connect(host, port, opts \\ []) do

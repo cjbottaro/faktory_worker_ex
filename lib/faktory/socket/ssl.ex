@@ -1,4 +1,5 @@
 defmodule Faktory.Socket.Ssl do
+  @moduledoc false
   defstruct [:socket]
 
   def connect(host, port, opts \\ []) do
