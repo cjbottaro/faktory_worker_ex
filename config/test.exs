@@ -1,3 +1,3 @@
 import Config
 
-config :faktory_worker_ex, Faktory.Client.Default, port: 7421
+config :faktory_worker_ex, Faktory.DefaultClient, port: 7421
