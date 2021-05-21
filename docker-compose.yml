@@ -17,10 +17,11 @@ services:
       - "7422:7420"
 
   test_tls:
-    image: contribsys/faktory:1.5.1
-    command: ./faktory -b :7419 -w :7420 -l debug -e production
+    image: faktory-tls
+    build:
+      context: faktory-tls
     environment: 
       FAKTORY_PASSWORD: "123abc"
     ports:
-      - "7423:7419"
+      - "7423:7423"
       - "7424:7420"
