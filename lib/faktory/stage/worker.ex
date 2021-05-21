@@ -25,7 +25,7 @@ defmodule Faktory.Stage.Worker do
 
   def init(config) do
     Process.flag(:trap_exit, true) # For graceful shutdown.
-    Logger.info "Worker stage for #{human_name(config)} starting up -- #{config[:concurrency]}"
+    Logger.info "#{human_name(config)} worker stage starting up -- #{config[:concurrency]}"
 
     config = update_in(config[:middleware], &List.wrap/1)
 

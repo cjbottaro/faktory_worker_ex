@@ -21,7 +21,7 @@ defmodule Faktory.Stage.Fetcher do
   end
 
   def init(config) do
-    Logger.info "Fetcher stage for #{human_name(config)} starting up -- #{inspect config[:queues]}"
+    Logger.info "#{human_name(config)} fetcher stage starting up -- #{inspect config[:queues]}"
 
     {:ok, conn} = config
     |> Keyword.drop([:name])
