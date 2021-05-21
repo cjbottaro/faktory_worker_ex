@@ -44,13 +44,9 @@ defmodule Faktory.Utils do
     (System.monotonic_time(:millisecond) - start_time) / 1000
   end
 
-  def hash_password(password, salt, iterations) do
-    1..iterations
-    |> Enum.reduce(password <> salt, fn(_i, acc) ->
-      :crypto.hash(:sha256, acc)
-    end)
-    |> Base.encode16()
-    |> String.downcase()
+  def hash_password(p, s, i) do
+    Enum.reduce(1..i, p <> s, fn _i, data -> :crypto.hash(:sha256, data) end)
+    |> Base.encode16(case: :lower)
   end
 
   def unix_pid do

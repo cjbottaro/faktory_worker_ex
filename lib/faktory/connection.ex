@@ -571,7 +571,11 @@ defmodule Faktory.Connection do
           %{usec: System.monotonic_time(:microsecond) - state.connecting_at},
           %{config: state.config, reason: reason}
         )
-        {:backoff, 1000, state}
+
+        case reason do
+          "ERR Invalid password" -> {:stop, "Invalid password"}
+          _ -> {:backoff, 1000, state}
+        end
     end
   end
 
@@ -588,6 +592,8 @@ defmodule Faktory.Connection do
       :ok <- Socket.active(socket, :once)
     do
       {:ok, socket, greeting}
+    else
+      {:ok, {:error, reason}} -> {:error, reason}
     end
   end
 

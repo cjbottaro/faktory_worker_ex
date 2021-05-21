@@ -10,7 +10,7 @@ defmodule Faktory.Protocol do
 
   @type jid :: binary
 
-  def hello(_greeting, config) do
+  def hello(greeting, config) do
     # %{
     #   password: state.password,
     #   hostname: Utils.hostname,
@@ -25,6 +25,14 @@ defmodule Faktory.Protocol do
       labels: ["elixir"],
       v: 2
     }
+
+    payload = case greeting do
+      %{"s" => s, "i" => i} ->
+        pwdhash = Faktory.Utils.hash_password(config.password || "", s, i)
+        Map.put(payload, "pwdhash", pwdhash)
+
+      _ -> payload
+    end
 
     payload = if config.wid do
       Map.put(payload, :wid, config.wid)
