@@ -16,15 +16,11 @@ defmodule Mix.Tasks.Faktory do
   @doc false
   def run(args) do
     Application.put_env(:faktory_worker_ex, :start_workers, true)
+    Mix.Tasks.Run.run run_args() ++ args
+  end
 
-    if args != [] do
-      Mix.shell().error("mix faktory does not take any arguments")
-      System.halt(1)
-    end
-
-    if not iex_running?() do
-      Mix.Task.run("run", ["--no-halt"])
-    end
+  defp run_args do
+    if iex_running?(), do: [], else: ["--no-halt"]
   end
 
   defp iex_running? do

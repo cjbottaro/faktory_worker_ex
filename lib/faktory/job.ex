@@ -87,7 +87,7 @@ defmodule Faktory.Job do
   @defaults [
     queue: "default",
     middleware: [],
-    client: Faktory.Client.Default,
+    client: Faktory.DefaultClient,
   ]
 
   @doc """

@@ -9,7 +9,8 @@ defmodule Faktory.Application do
     :ok = Faktory.Logger.Job.init()
 
     children = [
-      Faktory.Client.Default
+      Faktory.DefaultClient,
+      Faktory.DefaultWorker,
     ]
 
     Supervisor.start_link(children, strategy: :one_for_one)

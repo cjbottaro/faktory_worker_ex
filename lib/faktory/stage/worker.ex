@@ -63,8 +63,7 @@ defmodule Faktory.Stage.Worker do
 
     task = Task.async(fn ->
       Faktory.Middleware.traverse(job, middleware, fn job ->
-        module = jobtype_map[job.jobtype]
-        module || raise(Faktory.Error.InvalidJobType, message: job.jobtype)
+        module = resolve_job_module(job.jobtype, jobtype_map)
         log_start(job, state)
         apply(module, :perform, job.args)
       end)
@@ -231,6 +230,18 @@ defmodule Faktory.Stage.Worker do
 
   defp monotonic_time do
     System.monotonic_time(:microsecond)
+  end
+
+  defp resolve_job_module(jobtype, jobtype_map) do
+    case jobtype_map[jobtype] do
+      nil -> try do
+        Module.safe_concat([jobtype])
+      rescue
+        ArgumentError -> raise(Faktory.Error.InvalidJobType, message: jobtype)
+      end
+
+      job_module -> job_module
+    end
   end
 
 end

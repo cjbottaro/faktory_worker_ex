@@ -120,29 +120,7 @@ defmodule Faktory.Worker do
     config = Application.get_application(__MODULE__)
     |> Application.get_env(__MODULE__, [])
 
-    {:ok, modules} = Application.get_application(__MODULE__)
-    |> :application.get_key(:modules)
-
-    inferred_jobtype_map = Enum.reduce(modules, %{}, fn module, acc ->
-      {:module, ^module} = Code.ensure_loaded(module)
-      behaviours = module.module_info(:attributes)
-      |> Keyword.get_values(:behaviour)
-      |> List.flatten()
-
-      if Faktory.Job in behaviours do
-        Map.put(acc, module.config[:jobtype], module)
-      else
-        acc
-      end
-    end)
-
-    explicit_jobtype_map = Keyword.get(config, :jobtype_map, [])
-    |> Map.new()
-
-    jobtype_map = Map.merge(inferred_jobtype_map, explicit_jobtype_map)
-
     Keyword.merge(@defaults, config)
-    |> Keyword.put(:jobtype_map, jobtype_map)
   end
 
   @doc """
@@ -224,7 +202,7 @@ defmodule Faktory.Worker do
   @doc false
   def merge_configs(c1, c2) do
     if c2[:jobtype_map] do
-      jtm1 = c1[:jobtype_map] |> Map.new()
+      jtm1 = c1[:jobtype_map] || [] |> Map.new()
       jtm2 = c2[:jobtype_map] |> Map.new()
       Keyword.merge(c1, c2)
       |> Keyword.put(:jobtype_map, Map.merge(jtm1, jtm2))
@@ -251,10 +229,13 @@ defmodule Faktory.Worker do
       @config Keyword.put(unquote(config), :name, __MODULE__)
 
       def config do
-        Faktory.Worker.merge_configs(
-          Faktory.Worker.config(),
-          @config
-        )
+        config = Application.get_application(__MODULE__)
+        |> Application.get_env(__MODULE__, [])
+
+        [Faktory.Worker.config(), @config, config]
+        |> Enum.reduce([], fn config, acc ->
+          Faktory.Worker.merge_configs(acc, config)
+        end)
       end
 
       def child_spec(config) do
