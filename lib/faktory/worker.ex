@@ -175,12 +175,7 @@ defmodule Faktory.Worker do
       raise ArgumentError, ":shutdown cannot be less than 1000 ms"
     end
 
-    start = case config[:start] do
-      nil -> Application.get_env(:faktory_worker_ex, :start_workers, false)
-      start -> start
-    end
-
-    children = if start do
+    children = if should_start?(config) do
       [
         {Faktory.Stage.Fetcher, config},
         {Faktory.Stage.Worker, config},
@@ -221,6 +216,20 @@ defmodule Faktory.Worker do
     case Access.fetch!(config, :name) do
       name when is_atom(name) -> inspect(name)
       name when is_tuple(name) -> Access.fetch!(config, :wid)
+    end
+  end
+
+  defp should_start?(config) do
+    case Application.get_env(:faktory_worker_ex, :start_workers, false) do
+
+      true -> config[:start] in [nil, true]
+
+      :only -> config[:start] == true
+
+      :except -> config[:start] != false
+
+      false -> config[:start] == true
+
     end
   end
 

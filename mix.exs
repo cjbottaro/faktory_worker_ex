@@ -24,9 +24,10 @@ defmodule Faktory.Mixfile do
       # Docs
       docs: [
         extras: [
+          "README.md": [title: "README"],
           "CHANGELOG.md": [title: "CHANGELOG"],
         ],
-        main: "Faktory",
+        main: "README",
         groups_for_modules: [
           "Logging": [~r/Faktory\.Logger\.\w+/],
         ],
