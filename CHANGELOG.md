@@ -4,15 +4,14 @@
 Detailed info in the linked pull requests.
 
 * Basically an entire rewrite. (PR [#68](https://github.com/cjbottaro/faktory_worker_ex/pull/68))
-
 * Granular control over starting workers. (PR [#64](https://github.com/cjbottaro/faktory_worker_ex/pull/64))
 * Graceful shutdown. (PR [#43](https://github.com/cjbottaro/faktory_worker_ex/pull/43), [#56](https://github.com/cjbottaro/faktory_worker_ex/pull/56), [#63](https://github.com/cjbottaro/faktory_worker_ex/pull/63))
 * Internally respect "reserve_for" (PR [#63](https://github.com/cjbottaro/faktory_worker_ex/pull/63))
 * --no-start command line option (PR [#62](https://github.com/cjbottaro/faktory_worker_ex/pull/62))
 * Move protocol functions to `Faktory.Client` (PR [#61](https://github.com/cjbottaro/faktory_worker_ex/pull/61))
 * Erlang modules don't expose `__info__/1`. (PR [#58](https://github.com/cjbottaro/faktory_worker_ex/pull/58))
-* Make `Faktory.push/2` a low level API. (PR [#57](https://github.com/cjbottaro/faktory_worker_ex/pull/57))
-* Make `Faktory.push/2` return errors. (PR [#57](https://github.com/cjbottaro/faktory_worker_ex/pull/57))
+* Make Faktory.push/2 a low level API. (PR [#57](https://github.com/cjbottaro/faktory_worker_ex/pull/57))
+* Make Faktory.push/2 return errors. (PR [#57](https://github.com/cjbottaro/faktory_worker_ex/pull/57))
 * Use GenStage instead of BlockingQueue. (PR [#36](https://github.com/cjbottaro/faktory_worker_ex/pull/36))
 * Find the right job module when jobtype doesn't match module name. (PR [#35](https://github.com/cjbottaro/faktory_worker_ex/pull/35))
 * Implement Redis Serialization Protocol (RESP). (PR [#40](https://github.com/cjbottaro/faktory_worker_ex/pull/40))

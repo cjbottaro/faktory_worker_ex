@@ -89,10 +89,9 @@ defmodule Faktory.Client do
   end
 
   @doc """
-  Configuration from `Config`.
+  Resolved configuration.
 
-  The options specified with `Config` will be merged with `defaults/0`.
-
+  The options specified with `Config` will be merged over `defaults/0`.
   ```
   config :faktory_worker_ex, #{inspect __MODULE__}, pool_size: 2
 
@@ -138,6 +137,10 @@ defmodule Faktory.Client do
     |> NimblePool.start_link()
   end
 
+  @doc """
+  Child specification for supervisors.
+  """
+  @spec child_spec(config :: Keyword.t) :: Supervisor.child_spec()
   def child_spec(config) do
     config = Keyword.merge(config(), config)
 
@@ -179,7 +182,12 @@ defmodule Faktory.Client do
   @doc """
   Enqueue a job.
 
-  See `Faktory.Connection.push/3`.
+  ## Options
+  * `:middleware` (atom | [atom]) Run the job through specified middleware
+    before pushing it to the server. This will override the middleware specified
+    configured for the client.
+
+  See `Faktory.Connection.push/2`.
   """
   @spec push(t, Faktory.push_job, Keyword.t) :: {:ok, Faktory.push_job} | {:error, term}
   def push(client, opts \\ [], job) do
@@ -210,6 +218,55 @@ defmodule Faktory.Client do
   def mutate(client, mutation) do
     with_conn(client, fn conn, _config -> Faktory.Connection.mutate(conn, mutation) end)
   end
+
+  @doc """
+  Resolved configuration.
+
+  Options from `use` and `Config` will be merged over `Faktory.Client.config/0`.
+  """
+  @callback config() :: Keyword.t
+
+  @doc """
+  Child specification for supervisors.
+  """
+  @callback child_spec(config :: Keyword.t) :: Supervisor.child_spec()
+
+  @doc """
+  Start up a client.
+
+  `config` is merged over `c:config/0`.
+
+  See `Faktory.Client.start_link/1`.
+  """
+  @callback start_link(config :: Keyword.t) :: t
+
+  @doc """
+  Enqueue a job.
+
+  See `Faktory.Client.push/3`.
+  """
+  @callback push(opts :: Keyword.t, job :: Faktory.push_job) :: Faktory.push_job
+
+  @doc """
+  Get Faktory server info.
+
+  See `Faktory.Client.info/1`.
+  """
+  @callback info() :: {:ok, map} | {:error, term}
+
+  @doc """
+  Reset Faktory server.
+
+  See `Faktory.Client.flush/1`.
+  """
+  @callback flush() :: :ok | {:error, term}
+
+  @doc """
+  Mutate API.
+
+  See `Faktory.Client.mutate/2`.
+  """
+  @callback mutate(mutation :: Keyword.t | map) :: :ok | {:error, term}
 
   defmacro __using__(config \\ []) do
     base = __MODULE__
@@ -244,6 +301,7 @@ defmodule Faktory.Client do
       def info(), do: @base.info(__MODULE__)
       def push(opts \\ [], job), do: @base.push(__MODULE__, opts, job)
       def flush(), do: @base.flush(__MODULE__)
+      def mutate(mutation), do: @base.mutate(__MODULE__, mutation)
     end
   end
 

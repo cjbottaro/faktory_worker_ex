@@ -1,4 +1,10 @@
 defmodule Faktory do
+  @moduledoc """
+  Types shared by multiple modules.
+
+  If you're looking for how to use this library, see the [README](README.md) or other
+  module docs.
+  """
 
   # Represents a unique job id.
   @type jid :: binary
@@ -28,7 +34,7 @@ defmodule Faktory do
   }
 
   @typedoc """
-  Job argument for `Faktory.Client.push/3` and `Faktory.Connection.push/3`.
+  Job argument for `Faktory.Client.push/3` and `Faktory.Connection.push/2`.
 
   If `:jid` is not specified, it will be filled out automatically (recommended).
 

@@ -9,29 +9,19 @@ defmodule Faktory.Middleware do
   It's just a simple behaviour that requires `call/2`. Almost no reason to
   even make it a behaviour other than having a module to attach documentation to.
 
-  Let's make worker middleware that logs how long jobs take to process.
-
   ```elixir
-  defmodule JobTimer do
+  defmodule FooMiddleware do
     use Faktory.Middleware
-    import Faktory.Utils, only: [now_in_ms: 0]
-    alias Faktory.Logger
 
     def call(job, f) do
-      # Alter the job by putting a start time in the custom field.
-      job = job
-        |> Map.put_new("custom", %{})
-        |> put_in(["custom", "start_time"], now_in_ms())
+      # Alter a job
+      job = %{job | queue: "new-queue"}
 
-      # Pass it along to get processed.
+      # Pass it along down the chain.
       job = f.(job)
 
-      # Calculate the elapse time.
-      elapsed = now_in_ms() - job["custom"]["start_time"]
-      elapsed = (elapsed / 1000) |> Float.round(3)
-      jid = job["jid"]
-
-      Logger.info("Job #{jid} took #{elapsed} seconds!")
+      # Something could have altered it down stream.
+      job[:queue] == "new-new-queue"
 
       # Always return the job for other middlewares further up the chain.
       job
@@ -43,19 +33,36 @@ defmodule Faktory.Middleware do
 
   ```elixir
   config :my_cool_app, MyWorker,
-    middleware: [JobTimer]
+    middleware: [FooMiddleware]
   ```
-
-  Super contrived because we don't actually need to alter the job to time it.
-  It's just meant to illustrate the idea of altering a job in a way that other
-  middlewares further up or down the chain can see the change.
 
   It is important to capture the changes to the job after passing it along:
   ```elixir
-    job = f.(job)
+  job = f.(job)
   ```
   That way you can see any changes made after handing it off and it comes
-  back down the chain after being processed.
+  up down the chain after being processed.
+
+  ## Global configuration
+
+  Set middleware for all workers.
+  ```
+  config :faktory_worker_ex, Faktory.Worker,
+    middleware: [FooMiddleware, BarMiddleware]
+  ```
+
+  Set middleware for all jobs. This will affect all `c:Faktory.Job.perform_async/2` calls.
+  ```
+  config :faktory_worker_ex, Faktory.Job,
+    middleware: [FooMiddleware, BarMiddleware]
+  ```
+
+  Set middelware for all `Faktory.Client.push/3`, `c:Faktory.Client.push/2`,
+  and `c:Faktory.Job.perform_async/2` calls.
+  ```
+  config :faktory_worker_ex, Faktory.Client,
+    middleware: [FooMiddleware, BarMiddleware]
+  ```
   """
 
   defmacro __using__(_options) do
@@ -64,7 +71,7 @@ defmodule Faktory.Middleware do
     end
   end
 
-  @type job :: map
+  @type job :: Faktory.push_job()
 
   @doc """
   Invoke the middleware.

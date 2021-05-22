@@ -30,6 +30,7 @@ defmodule Faktory.Logger.Command do
   * `[:faktory, :command, :ack]`
   * `[:faktory, :command, :fail]`
   * `[:faktory, :command, :flush]`
+  * `[:faktory, :command, :mutate]`
   """
 
   require Logger
@@ -50,6 +51,7 @@ defmodule Faktory.Logger.Command do
         [:faktory, :command, :ack],
         [:faktory, :command, :fail],
         [:faktory, :command, :flush],
+        [:faktory, :command, :mutate],
       ],
       &__MODULE__.log/4,
       Map.new(config)

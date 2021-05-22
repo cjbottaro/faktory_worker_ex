@@ -45,7 +45,7 @@ $ mix faktory
 ## Connection options
 
 By default, both client and worker connections will connect to `localhost:7419`.
-You can change that via configuration.
+You can change that via `Config`.
 
 ```elixir
 import Config
@@ -95,7 +95,7 @@ All the configuration options are deep merged according to the hierarchy rules.
 
 To run the quickstart example, you need to run a Faktory server.
 
-Easiest way is with Docker:
+Easiest way is with Docker.
 ```
 docker run --rm -p 7419:7419 -p 7420:7420 contribsys/faktory:latest -b :7419 -w :7420
 ```
@@ -108,16 +108,16 @@ You should be able to go to [http://localhost:7420](http://localhost:7420) and s
 import Config
 
 config :my_app, FooClient,
-  host: "foo.faktory.myapp.com"
+  host: "foo-faktory.myapp.com"
 
 config :my_app, BarClient,
-  host: "bar.faktory.myapp.com"
+  host: "bar-faktory.myapp.com"
 
 config :my_app, FooWorker,
-  host: "foo.faktory.myapp.com"
+  host: "foo-faktory.myapp.com"
 
 config :my_app, BarWorker,
-  host: "bar.faktory.myapp.com"
+  host: "bar-faktory.myapp.com"
 
 defmodule FooClient do
   use Faktory.Client
@@ -145,8 +145,31 @@ defmodule BarJob do
   def perform(), do: nil
 end
 
-FooJob.perform_async([]) # Enqueues job to Faktory server at foo.faktory.myapp.com
-BarJob.perform_async([]) # Enqueues job to Faktory server at bar.faktory.myapp.com
+FooJob.perform_async([]) # Enqueues job to Faktory server at foo-faktory.myapp.com
+BarJob.perform_async([]) # Enqueues job to Faktory server at bar-faktory.myapp.com
+```
+
+Be sure to add your workers to your application's supervision tree.
+```elixir
+defmodule MyApp.Application do
+  use Application
+
+  def start(_type, _args) do
+    children = [
+      FooWorker,
+      BarWorker,
+    ]
+
+    Supervisor.start_link(children, strategy: :one_for_one)
+  end
+end
+```
+
+And disable the default worker.
+```
+use Config
+
+config :faktory_worker_ex, Faktory.DefaultWorker, start: false
 ```
 
 ## Starting individual workers
@@ -174,11 +197,10 @@ config :my_app, BarWorker, start: false
 ## Features
 
 * Middleware
-* Connection pooling (for clients)
+* Connection pooling
 * Support for multiple Faktory servers
 * Supports 100% of Faktory features
 * Comprehensive documentation
-* Comprehensive supervision tree
 * Decent integration tests
 
 ## Issues / Questions
