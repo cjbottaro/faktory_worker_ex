@@ -256,8 +256,7 @@ defmodule Faktory.Worker do
             Faktory.Worker,
             :start_link,
             [config]
-          },
-          restart: :transient
+          }
         }
       end
 
