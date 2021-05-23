@@ -101,7 +101,30 @@ defmodule Faktory.Stage.Fetcher do
 
   end
 
-  def handle_info({:faktory, :beat, :quiet}, state) do
+  def handle_info({:faktory, :beat, result}, state) do
+    case result do
+      {:ok, "OK"} -> {:noreply, [], state}
+
+      {:ok, json} -> case Jason.decode!(json) do
+        %{"state" => "quiet"} -> handle_beat_quiet(state)
+        %{"state" => "terminate"} -> handle_beat_terminate(state)
+      end
+
+      {:error, reason} -> handle_beat_error(state, reason)
+    end
+  end
+
+  def handle_cast(:quiet, state) do
+    %{config: config} = state
+
+    if not state.quiet do
+      Logger.info "Fetcher stage for #{human_name(config)} quieted by shutdown"
+    end
+
+    {:noreply, [], %{state | quiet: true}}
+  end
+
+  def handle_beat_quiet(state) do
     %{config: config, demand: demand} = state
 
     if not state.quiet do
@@ -111,7 +134,7 @@ defmodule Faktory.Stage.Fetcher do
     {:noreply, [], %{state | quiet: true}}
   end
 
-  def handle_info({:faktory, :beat, :terminate}, state) do
+  def handle_beat_terminate(state) do
     %{config: config, demand: demand} = state
 
     if not state.terminate do
@@ -123,14 +146,17 @@ defmodule Faktory.Stage.Fetcher do
     {:noreply, [], %{state | terminate: true}}
   end
 
-  def handle_cast(:quiet, state) do
-    %{config: config} = state
+  # ERR Unknown worker bd9c6c213ad52d84
+  def handle_beat_error(reason, state) do
+    %{config: config, demand: demand} = state
 
-    if not state.quiet do
-      Logger.info "Fetcher stage for #{human_name(config)} quieted by shutdown"
+    if not state.terminate do
+      Logger.info "Fetcher stage for #{human_name(config)} stopped heartbeat #{reason} -- #{config.concurrency - demand} jobs running"
+      Faktory.Worker.name(config)
+      |> Faktory.Worker.stop()
     end
 
-    {:noreply, [], %{state | quiet: true}}
+    {:noreply, [], %{state | terminate: true}}
   end
 
 end

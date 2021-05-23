@@ -464,13 +464,11 @@ defmodule Faktory.Connection do
     beat_state = case result do
       {:ok, "OK"} -> nil
       {:ok, json} -> Jason.decode!(json) |> Map.fetch!("state") |> String.to_atom()
-      {:error, reason} ->
-        Logger.error("Heartbeat #{reason}")
-        nil
+      {:error, reason} -> Logger.error("Heartbeat #{reason}"); nil
     end
 
-    if beat_state && config.beat_receiver do
-      send(config.beat_receiver, {:faktory, :beat, beat_state})
+    if config.beat_receiver do
+      send(config.beat_receiver, {:faktory, :beat, result})
     end
 
     :telemetry.execute(
