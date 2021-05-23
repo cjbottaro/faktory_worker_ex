@@ -131,7 +131,7 @@ defmodule Faktory.Stage.Worker do
     %{config: config, tasks: tasks} = state
 
     count = map_size(tasks)
-    Logger.info "Worker stage for #{human_name(config)} shutting down -- #{count} jobs running"
+    Logger.info "#{human_name(config)} worker stage shutting down -- #{count} jobs running"
 
     start_time = monotonic_time()
 
@@ -153,7 +153,7 @@ defmodule Faktory.Stage.Worker do
 
     time = (monotonic_time() - start_time) |> Faktory.Utils.format_duration()
 
-    Logger.info "Worker stage for #{human_name(config)} shutdown -- #{time}"
+    Logger.info "#{human_name(config)} worker stage shutdown -- #{time}"
   end
 
   defp ack(task, value, state, retries \\ 0) do

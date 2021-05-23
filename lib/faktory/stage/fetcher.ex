@@ -128,7 +128,7 @@ defmodule Faktory.Stage.Fetcher do
     %{config: config, demand: demand} = state
 
     if not state.quiet do
-      Logger.info "Fetcher stage for #{human_name(config)} quieted by UI -- #{config.concurrency - demand} jobs running"
+      Logger.info "#{human_name(config)} fetcher stage quieted by UI -- #{config.concurrency - demand} jobs running"
     end
 
     {:noreply, [], %{state | quiet: true}}
@@ -138,9 +138,9 @@ defmodule Faktory.Stage.Fetcher do
     %{config: config, demand: demand} = state
 
     if not state.terminate do
-      Logger.info "Fetcher stage for #{human_name(config)} stopped by UI -- #{config.concurrency - demand} jobs running"
+      Logger.info "#{human_name(config)} fetcher stage stopped by UI -- #{config.concurrency - demand} jobs running"
       Faktory.Worker.name(config)
-      |> Faktory.Worker.stop()
+      |> Faktory.Worker.stop(:shutdown)
     end
 
     {:noreply, [], %{state | terminate: true}}
@@ -151,9 +151,9 @@ defmodule Faktory.Stage.Fetcher do
     %{config: config, demand: demand} = state
 
     if not state.terminate do
-      Logger.info "Fetcher stage for #{human_name(config)} stopped heartbeat #{reason} -- #{config.concurrency - demand} jobs running"
+      Logger.info "#{human_name(config)} fetcher stage stopped by heartbeat #{reason} -- #{config.concurrency - demand} jobs running"
       Faktory.Worker.name(config)
-      |> Faktory.Worker.stop()
+      |> Faktory.Worker.stop(:shutdown)
     end
 
     {:noreply, [], %{state | terminate: true}}

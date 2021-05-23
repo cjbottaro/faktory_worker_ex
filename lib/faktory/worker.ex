@@ -186,12 +186,12 @@ defmodule Faktory.Worker do
 
     Supervisor.start_link(children,
       strategy: :one_for_one,
-      name: config[:name]
+      name: config[:name],
     )
   end
 
-  def stop(worker) do
-    Supervisor.stop(worker)
+  def stop(worker, reason \\ :normal) do
+    Supervisor.stop(worker, reason)
   end
 
   @doc false
@@ -256,7 +256,8 @@ defmodule Faktory.Worker do
             Faktory.Worker,
             :start_link,
             [config]
-          }
+          },
+          restart: :transient
         }
       end
 
