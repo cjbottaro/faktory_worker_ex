@@ -559,7 +559,7 @@ defmodule Faktory.Connection do
           %{config: state.config, disconnected: state.disconnected}
         )
         timer = if state.config.wid do
-          Process.send_after(self(), :beat, @beat_interval)
+          send(self(), :beat) # Heartbeat immediately so we can see mem usage in UI right away.
         else
           nil
         end

@@ -270,7 +270,7 @@ defmodule Faktory.Worker do
 
   The given `config` will be merged over `c:config/0`.
   """
-  @callback start_link(config :: Keyword.t) :: {:ok, GenServer.server()} | {:error, term}
+  @callback start_link(config :: Keyword.t) :: {:ok, pid} | {:error, term}
 
   defmacro __using__(config \\ []) do
     quote do
@@ -303,6 +303,10 @@ defmodule Faktory.Worker do
       def start_link(config \\ []) do
         config = Faktory.Worker.merge_configs(config(), config)
         Faktory.Worker.start_link(config)
+      end
+
+      def stop(reason \\ :normal) do
+        Faktory.Worker.stop(__MODULE__, reason)
       end
     end
   end
