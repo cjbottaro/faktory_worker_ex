@@ -123,6 +123,15 @@ defmodule Faktory.Worker do
     Keyword.merge(@defaults, config)
   end
 
+  def child_spec(config) do
+    config = merge_configs(config(), config)
+
+    %{
+      id: {__MODULE__, Faktory.Utils.new_wid()}, # The id doesn't matter; it might as well be random.
+      start: {__MODULE__, :start_link, [config]}
+    }
+  end
+
   @doc """
   Start up a Faktory worker.
 
@@ -233,9 +242,40 @@ defmodule Faktory.Worker do
     end
   end
 
+  @doc """
+  Worker module configuration.
+
+  ```
+  defmodule MyWorker do
+    use Faktory.Worker, concurrency: 2
+  end
+
+  config :my_app, MyWorker, queues: ["some-queue"]
+
+  iex(1)> MyWorker.config()
+  #{inspect Keyword.merge(@defaults, concurrency: 2, queues: ["some-queue"]), pretty: true, width: 0}
+  ```
+  """
+  @callback config :: Keyword.t
+
+  @doc """
+  Child specification for supervisors.
+
+  The given `config` will be merged over `c:config/0`.
+  """
+  @callback child_spec(config :: Keyword.t) :: Supervisor.child_spec()
+
+  @doc """
+  Start up the worker.
+
+  The given `config` will be merged over `c:config/0`.
+  """
+  @callback start_link(config :: Keyword.t) :: {:ok, GenServer.server()} | {:error, term}
+
   defmacro __using__(config \\ []) do
     quote do
       @config Keyword.put(unquote(config), :name, __MODULE__)
+      @behaviour Faktory.Worker
 
       def config do
         config = Application.get_application(__MODULE__)
@@ -267,28 +307,4 @@ defmodule Faktory.Worker do
     end
   end
 
-  @doc """
-  Worker module configuration.
-
-  ```
-  defmodule MyWorker do
-    use Faktory.Worker, concurrency: 2
-  end
-
-  config :my_app, MyWorker, queues: ["some-queue"]
-
-  iex(1)> MyWorker.config()
-  #{inspect Keyword.merge(@defaults, concurrency: 2, queues: ["some-queue"]), pretty: true, width: 0}
-  ```
-  """
-  @callback config :: Keyword.t
-
-  def child_spec(config) do
-    config = merge_configs(config(), config)
-
-    %{
-      id: {__MODULE__, Faktory.Utils.new_wid()}, # The id doesn't matter; it might as well be random.
-      start: {__MODULE__, :start_link, [config]}
-    }
-  end
 end
