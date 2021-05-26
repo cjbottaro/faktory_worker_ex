@@ -113,4 +113,25 @@ defmodule BasicTest do
     assert message == "killed"
   end
 
+  # This test revealed that I wasn't using Exception.normalize/3 properly. Also
+  # revealed that I should be using Exception.message/1
+  test "match errors get turned into exceptions" do
+    MatchErrorJob.perform_async(["test"])
+
+    assert_receive {
+      [:faktory, :job, :start],
+      %{}
+    }
+
+    assert_receive {
+      [:faktory, :job, :fail],
+      %{reason: reason}
+    }
+
+    {errtype, message, _} = Faktory.Error.down_reason_to_fail_args(reason)
+
+    assert errtype == "MatchError"
+    assert message == "no match of right hand side value: \"test\""
+  end
+
 end

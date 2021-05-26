@@ -14,11 +14,11 @@ defmodule Faktory.Error do
   @spec down_reason_to_exception(reason :: {atom | struct, list} | atom) :: {struct, list}
   def down_reason_to_exception(reason) do
     case reason do
-      {reason, trace} when (is_atom(reason) or is_struct(reason)) and is_list(trace) ->
+      {reason, trace} ->
         e = Exception.normalize(:error, reason, trace)
         {e, trace}
 
-      reason when is_atom(reason) ->
+      reason ->
         e = %__MODULE__.ProcessExit{message: to_string(reason)}
         {e, []}
     end
@@ -28,7 +28,7 @@ defmodule Faktory.Error do
     {e, trace} = down_reason_to_exception(reason)
 
     errtype = inspect(e.__struct__)
-    message = e.message
+    message = Exception.message(e)
     backtrace = Enum.map(trace, &Exception.format_stacktrace_entry/1)
 
     {errtype, message, backtrace}
