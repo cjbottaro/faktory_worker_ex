@@ -11,15 +11,19 @@ defmodule Faktory.Error do
     defexception [:message]
   end
 
-  @spec down_reason_to_exception(reason :: {atom | struct, list} | atom) :: {struct, list}
+  @spec down_reason_to_exception(reason :: term) :: {struct, list}
   def down_reason_to_exception(reason) do
     case reason do
-      {reason, trace} ->
+      {reason, trace} when is_list(trace) ->
         e = Exception.normalize(:error, reason, trace)
         {e, trace}
 
-      reason ->
+      reason when is_atom(reason) or is_binary(reason) ->
         e = %__MODULE__.ProcessExit{message: to_string(reason)}
+        {e, []}
+
+      reason ->
+        e = %__MODULE__.ProcessExit{message: inspect(reason)}
         {e, []}
     end
   end
