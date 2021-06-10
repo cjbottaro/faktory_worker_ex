@@ -3,8 +3,9 @@ defmodule ErrorTest do
 
   test "timeout error" do
     reason = {:timeout, {Task.Supervised, :stream, [5000]}}
-    {e, []} = Faktory.Error.down_reason_to_exception(reason)
-    %Faktory.Error.ProcessExit{} = e
+    {errtype, errmsg, []} = Faktory.Error.down_reason_to_fail_args(reason)
+    assert errtype == "ErlangError"
+    assert String.contains?(errmsg, "timeout")
   end
 
 end

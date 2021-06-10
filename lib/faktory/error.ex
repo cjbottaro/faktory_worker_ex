@@ -18,6 +18,10 @@ defmodule Faktory.Error do
         e = Exception.normalize(:error, reason, trace)
         {e, trace}
 
+      reason when is_tuple(reason) ->
+        e = Exception.normalize(:error, reason)
+        {e, []}
+
       reason when is_atom(reason) or is_binary(reason) ->
         e = %__MODULE__.ProcessExit{message: to_string(reason)}
         {e, []}
