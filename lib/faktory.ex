@@ -11,6 +11,7 @@ defmodule Faktory do
 
   @type json :: (
     binary  |
+    boolean |
     integer |
     float   |
     nil     |
@@ -54,7 +55,6 @@ defmodule Faktory do
     optional(:custom) => json
   }
 
-  # A connection to the Faktory server.
   @type conn :: GenServer.server()
 
 end
