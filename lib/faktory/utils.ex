@@ -15,7 +15,10 @@ defmodule Faktory.Utils do
   # This will convert an enum into a map with atom keys.
   def atomify_keys(enum) do
     Enum.reduce enum, %{}, fn {k, v}, acc ->
-      k = k |> to_string |> String.to_atom
+      k = case k do
+        k when is_atom(k) -> k
+        k when is_binary(k) -> String.to_atom(k)
+      end
       Map.put(acc, k, v)
     end
   end
