@@ -192,7 +192,11 @@ defmodule Faktory.Client do
   @spec push(t, Faktory.push_job, Keyword.t) :: {:ok, Faktory.push_job} | {:error, term}
   def push(client, opts \\ [], job) do
     with_conn(client, fn conn, config ->
-      middleware = opts[:middleware] || config[:middleware]
+      middleware = case opts[:middleware] do
+        nil -> config[:middleware]
+        [] -> config[:middleware]
+        middleware -> middleware
+      end
       Faktory.Middleware.traverse(job, middleware, fn job ->
         Faktory.Connection.push(conn, job)
       end)
