@@ -148,6 +148,10 @@ defmodule Faktory.Job do
     |> Map.put_new(:jid, Faktory.Utils.new_jid())
     |> Map.put_new(:args, [])
     |> Map.put_new(:reserve_for, 1800)
+    |> Map.update!(:jobtype, fn
+      jobtype when is_binary(jobtype) -> jobtype
+      jobtype when is_atom(jobtype) -> inspect(jobtype)
+    end)
   end
 
   def new(fields) when is_binary(fields) do
