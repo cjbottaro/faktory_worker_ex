@@ -52,7 +52,7 @@ defmodule Faktory.Mixfile do
       {:jason, "~> 1.1"},
       {:gen_stage, "~> 1.0"},
       {:nimble_pool, "~> 0.0"},
-      {:telemetry, "~> 0.4"},
+      {:telemetry, "~> 0.4 or ~> 1.0"},
       {:ex_doc, "~> 0.19", only: :dev},
     ]
   end
