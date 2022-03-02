@@ -109,6 +109,7 @@ defmodule Faktory.Connection do
   @defaults [
     host: "localhost",
     port: 7419,
+    username: nil,
     password: nil,
     tls: false,
     wid: nil,

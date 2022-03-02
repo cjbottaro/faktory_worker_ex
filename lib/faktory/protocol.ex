@@ -40,6 +40,12 @@ defmodule Faktory.Protocol do
       payload
     end
 
+    payload = if config.username do
+      Map.put(payload, :username, config.username)
+    else
+      payload
+    end
+
     ["HELLO", " ", Jason.encode!(payload), "\r\n"]
   end
 
