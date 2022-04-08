@@ -195,7 +195,7 @@ defmodule Faktory.Worker do
 
     Supervisor.start_link(children,
       strategy: :one_for_all,
-      name: config[:name],
+      name: config[:name]
     )
   end
 

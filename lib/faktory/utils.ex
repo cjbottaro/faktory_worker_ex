@@ -53,7 +53,7 @@ defmodule Faktory.Utils do
   end
 
   def unix_pid do
-    System.get_pid |> String.to_integer
+    System.pid |> String.to_integer
   end
 
   def hostname do

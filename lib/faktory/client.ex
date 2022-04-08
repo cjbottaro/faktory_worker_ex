@@ -162,7 +162,7 @@ defmodule Faktory.Client do
   end)
   ```
   """
-  @spec with_conn(t, (Faktory.Connection.t -> any)) :: any
+  @spec with_conn(t, ((Faktory.Connection.t, Keyword.t) -> any)) :: any
   def with_conn(client, f) do
     NimblePool.checkout!(client, :checkout, fn _, {conn, config} ->
       {f.(conn, config), conn}
@@ -189,7 +189,7 @@ defmodule Faktory.Client do
 
   See `Faktory.Connection.push/2`.
   """
-  @spec push(t, Faktory.push_job, Keyword.t) :: {:ok, Faktory.push_job} | {:error, term}
+  @spec push(t, Keyword.t, Faktory.push_job) :: {:ok, Faktory.push_job} | {:error, term}
   def push(client, opts \\ [], job) do
     job = case job do
       job when is_list(job) -> Map.new(job)
