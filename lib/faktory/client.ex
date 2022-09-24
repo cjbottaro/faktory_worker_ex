@@ -1,174 +1,318 @@
 defmodule Faktory.Client do
-  @moduledoc """
-  Create and configure a client for _enqueing_ jobs.
+  @moduledoc ~S"""
+  Pooled connections to a Faktory server.
 
-  It works exatly the same as configuring an Ecto Repo.
+  This is what you want to use to enqueue jobs to the Faktory server, using
+  either `push/3` directly or `c:Faktory.Job.perform_async/2`.
 
-  ```elixir
-  defmodule MyFaktoryClient do
-    use Faktory.Client, otp_app: :my_app
-  end
+  ```
+  defmodule MyJob do
+    use Faktory.Job, client: MyClient
 
-  # It must be added to your app's supervision tree
-  defmodule MyApp.Application do
-    use Application
-
-    def start(_type, _args) do
-      children = [MyFaktoryClient]
-      Supervisor.start_link(children, strategy: :one_for_one)
+    def perform(n1, n2) do
+      IO.puts("#{n1} plus #{n2} equals #{n1+n2}")
     end
   end
+
+  {:ok, client} = Faktory.Client.start_link(name: MyClient)
+  {:ok, job} = Faktory.Client.push(client, jobtype: "MyJob", args: [1, 2])
+  {:ok, job} = MyJob.perform_async([1, 2])
   ```
 
-  ## Defaults
+  ## Default configuration
 
-  See `defaults/0` for default client configuration.
+  You can override the [default options](`defaults/0`) that are sent to `start_link/1` using `Config`.
 
-  ## Compile time config
-
-  Done with Mix.Config, duh.
-
-  ```elixir
-  use Mix.Config
-
-  config :my_app, MyFaktoryClient,
-    host: "foo.bar",
-    port: 1000
-    pool: 10
+  ```
+  config :faktory_worker_ex, Faktory.Client,
+    host: "faktory.myapp.com",
+    pool_size: 2,
+    lazy: false
   ```
 
-  ## Runtime config
+  These will be merged with `defaults/0` and can be seen with `config/0`.
 
-  Can be done with the `c:init/1` callback.
+  ## Using as a module
 
-  Can be done with environment variable tuples:
-  ```elixir
-  use Mix.Config
+  This is nice so you don't have to constantly pass around a pid or name.
 
-  config :my_app, MyFaktoryClient,
-    host: {:system, "FAKTORY_HOST"} # No default, errors if FAKTORY_HOST doesn't exist
-    port: {:system, "FAKTORY_PORT", 1001} # Use 1001 if FAKTORY_PORT doesn't exist
+  ```
+  defmodule MyClient do
+    use Faktory.Client, host: "faktory.myapp.com", pool_size: 10
+  end
+
+  MyClient.start_link()
+  {:ok, info} = MyClient.info()
+  {:ok, job} = MyClient.push(jobtype: "MyJob", args: [1, 2])
   ```
 
-  ## Default client
+  The keyword list argument to `use` will be passed to `start_link/1`.
 
-  The first client to startup is the _default client_, unless otherwise specifed by
-  the `:default` option.
-
-  For example:
-  ```elixir
-  MyJob.perform_async([1, 2, 3]) # Uses default client
-  MyJob.perform_async([1, 2, 3], client: OtherFaktoryClient) # Uses some other client
+  You can specifically configure your client modules.
   ```
+  config :my_app, MyClient, host: "foo.bar.com"
+  ```
+
+  Module specific configuration will be merged with `use` arguments and also `config/0`.
+
   """
+  @behaviour NimblePool
+
+  @impl NimblePool
+  def init_worker(config) do
+    {:ok, conn} = Faktory.Connection.start_link(config)
+    {:ok, conn, config}
+  end
+
+  @impl NimblePool
+  def handle_checkout(:checkout, _from, conn, config) do
+    {:ok, {conn, config}, conn, config}
+  end
+
+  @type t :: GenServer.server()
 
   @defaults [
-    host: "localhost",
-    port: 7419,
-    pool: 5,
+    pool_size: 5,
+    lazy: true,
     middleware: [],
-    password: nil,
-    use_tls: false,
-    default: false
   ]
-
   @doc """
-  Return the default client configuration.
+  Default configuration.
 
-  ```elixir
-  iex(3)> Faktory.Client.defaults
-  [
-    host: "localhost",
-    port: 7419,
-    pool: 5,
-    middleware: [],
-    password: nil,
-    use_tls: false,
-    default: false
-  ]
+  ```
+  #{inspect @defaults, pretty: true, width: 0}
   ```
   """
-  @spec defaults :: Keyword.t
-  def defaults, do: @defaults
+  @spec defaults() :: Keyword.t
+  def defaults do
+    @defaults
+  end
 
-  defmacro __using__(options) do
+  @doc """
+  Resolved configuration.
+
+  The options specified with `Config` will be merged over `defaults/0`.
+  ```
+  config :faktory_worker_ex, #{inspect __MODULE__}, pool_size: 2
+
+  iex(1)> #{inspect __MODULE__}.config()
+  #{inspect Keyword.merge(@defaults, pool_size: 2), pretty: true, width: 0}
+  ```
+  """
+  @spec config() :: Keyword.t
+  def config do
+    config = Application.get_application(__MODULE__)
+    |> Application.get_env(__MODULE__, [])
+
+    Keyword.merge(@defaults, config)
+  end
+
+  @doc """
+  Start up a client.
+
+  `opts` is merged over `config/0`. All options are optional.
+
+  ## Options
+
+  * `:pool_size` (integer) how many connections are in the pool.
+  * `:lazy` (boolean) true if the connections are to started lazily.
+  * `:name` (`t:GenServer.name/0`) for GenServer name registration.
+
+  All remaining options are passed to `Faktory.Connection.start_link/1`.
+
+  ## Examples
+
+  ```
+  {:ok, client} = #{inspect __MODULE__}.start_link(host: "foo.bar.com", name: MyClient)
+
+  {:ok, client} = #{inspect __MODULE__}.start_link(pool_size: 2, lazy: false)
+  ```
+  """
+  def start_link(opts \\ []) do
+    {pool_opts, config} = Keyword.split(opts, [:pool_size, :lazy, :name])
+
+    @defaults
+    |> Keyword.merge(pool_opts)
+    |> Keyword.put(:worker, {__MODULE__, config})
+    |> NimblePool.start_link()
+  end
+
+  @doc """
+  Child specification for supervisors.
+  """
+  @spec child_spec(config :: Keyword.t) :: Supervisor.child_spec()
+  def child_spec(config) do
+    config = Keyword.merge(config(), config)
+
+    %{
+      id: config[:name] || raise(":name is required"),
+      start: {__MODULE__, :start_link, [config]}
+    }
+  end
+
+  @doc """
+  Get a connection from the pool.
+
+  The connection is returned to the pool automatically after the function is run.
+
+  You shouldn't really need to use this function.
+  ```
+  {:ok, info} = #{inspect __MODULE__}.with_conn(client, fn conn ->
+    Faktory.Connection.info(conn)
+  end)
+  ```
+  """
+  @spec with_conn(t, ((Faktory.Connection.t, Keyword.t) -> any)) :: any
+  def with_conn(client, f) do
+    NimblePool.checkout!(client, :checkout, fn _, {conn, config} ->
+      {f.(conn, config), conn}
+    end)
+  end
+
+  @doc """
+  Get Faktory server info.
+
+  See `Faktory.Connection.info/1`.
+  """
+  @spec info(t) :: {:ok, map} | {:error, term}
+  def info(client) do
+    with_conn(client, fn conn, _config -> Faktory.Connection.info(conn) end)
+  end
+
+  @doc """
+  Enqueue a job.
+
+  ## Options
+  * `:middleware` (atom | [atom]) Run the job through specified middleware
+    before pushing it to the server. This will override the middleware specified
+    configured for the client.
+
+  See `Faktory.Connection.push/2`.
+  """
+  @spec push(t, Keyword.t, Faktory.push_job) :: {:ok, Faktory.push_job} | {:error, term}
+  def push(client, opts \\ [], job) do
+    job = case job do
+      job when is_list(job) -> Map.new(job)
+      job when is_map(job) -> Faktory.Utils.atomify_keys(job)
+    end
+
+    with_conn(client, fn conn, config ->
+      middleware = case opts[:middleware] do
+        nil -> config[:middleware]
+        [] -> config[:middleware]
+        middleware -> middleware
+      end
+
+      Faktory.Middleware.traverse(job, middleware, fn job ->
+        Faktory.Connection.push(conn, job)
+      end)
+    end)
+  end
+
+  @doc """
+  Reset Faktory server.
+
+  See `Faktory.Connection.flush/1`.
+  """
+  @spec flush(t) :: :ok | {:error, term}
+  def flush(client) do
+    with_conn(client, fn conn, _config -> Faktory.Connection.flush(conn) end)
+  end
+
+  @doc """
+  Mutate API
+
+  See `Faktory.Connection.mutate/2`.
+  """
+  @spec mutate(t, Keyword.t | map) :: :ok | {:error, term}
+  def mutate(client, mutation) do
+    with_conn(client, fn conn, _config -> Faktory.Connection.mutate(conn, mutation) end)
+  end
+
+  @doc """
+  Resolved configuration.
+
+  Options from `use` and `Config` will be merged over `Faktory.Client.config/0`.
+  """
+  @callback config() :: Keyword.t
+
+  @doc """
+  Child specification for supervisors.
+  """
+  @callback child_spec(config :: Keyword.t) :: Supervisor.child_spec()
+
+  @doc """
+  Start up a client.
+
+  `config` is merged over `c:config/0`.
+
+  See `Faktory.Client.start_link/1`.
+  """
+  @callback start_link(config :: Keyword.t) :: t
+
+  @doc """
+  Enqueue a job.
+
+  See `Faktory.Client.push/3`.
+  """
+  @callback push(opts :: Keyword.t, job :: Faktory.push_job) :: Faktory.push_job
+
+  @doc """
+  Get Faktory server info.
+
+  See `Faktory.Client.info/1`.
+  """
+  @callback info() :: {:ok, map} | {:error, term}
+
+  @doc """
+  Reset Faktory server.
+
+  See `Faktory.Client.flush/1`.
+  """
+  @callback flush() :: :ok | {:error, term}
+
+  @doc """
+  Mutate API.
+
+  See `Faktory.Client.mutate/2`.
+  """
+  @callback mutate(mutation :: Keyword.t | map) :: :ok | {:error, term}
+
+  defmacro __using__(config \\ []) do
+    base = __MODULE__
+
     quote do
+      @base unquote(base)
+      @config unquote(config)
 
-      @otp_app unquote(options[:otp_app])
-      def otp_app, do: @otp_app
+      def config do
+        config = Application.get_application(__MODULE__)
+        |> Application.get_env(__MODULE__, [])
 
-      def init(config), do: config
-      defoverridable [init: 1]
+        @base.config()
+        |> Keyword.merge(@config)
+        |> Keyword.merge(config)
+      end
 
-      def type, do: :client
-      def client?, do: true
-      def worker?, do: false
+      def child_spec(config) do
+        config = Keyword.merge(config(), config)
+        |> Keyword.put(:name, __MODULE__)
 
-      def config, do: Faktory.Client.config(__MODULE__)
-      def child_spec(_opt \\ []), do: Faktory.Client.child_spec(__MODULE__)
+        @base.child_spec(config)
+      end
 
+      def start_link(config \\ []) do
+        Keyword.merge(config(), config)
+        |> Keyword.put(:name, __MODULE__)
+        |> @base.start_link()
+      end
+
+      def with_conn(f), do: @base.with_conn(__MODULE__, f)
+      def info(), do: @base.info(__MODULE__)
+      def push(opts \\ [], job), do: @base.push(__MODULE__, opts, job)
+      def flush(), do: @base.flush(__MODULE__)
+      def mutate(mutation), do: @base.mutate(__MODULE__, mutation)
     end
-  end
-
-  @doc """
-  Callback for doing runtime configuration.
-
-  ```
-  defmodule MyFaktoryClient do
-    use Faktory.Client, otp_app: :my_app
-
-    def init(config) do
-      config
-      |> Keyword.put(:host, "foo.bar")
-      |> Keyword.merge(port: 1001, pool: 10)
-    end
-  end
-  ```
-  """
-  @callback init(config :: Keyword.t) :: Keyword.t
-
-  @doc """
-  Returns a client's config after all runtime modifications have occurred.
-
-  ```elixir
-  iex(5)> MyFaktoryClient.config
-  [
-    port: 1001,
-    host: "foo.bar",
-    pool: 10,
-    middleware: [],
-    password: nil,
-    use_tls: false,
-    default: true
-  ]
-  ```
-  """
-  @callback config :: Keyword.t
-
-  @doc false
-  def config(module) do
-    Faktory.Configuration.call(module, @defaults)
-  end
-
-  @doc false
-  def child_spec(module) do
-    config = module.config
-    name = config[:name] || module
-
-    pool_options = [
-      name: {:local, name},
-      worker_module: Faktory.Connection,
-      size: config[:pool],
-      max_overflow: 2
-    ]
-
-    # If the user hasn't specified a default client, we default to the first client started.
-    cond do
-      config[:default] -> Faktory.put_env(:default_client, module)
-      !Faktory.get_env(:default_client) -> Faktory.put_env(:default_client, module)
-    end
-
-    :poolboy.child_spec(module, pool_options, config)
   end
 
 end

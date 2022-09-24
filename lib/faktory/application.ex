@@ -3,12 +3,16 @@ defmodule Faktory.Application do
   use Application
 
   def start(_type, _args) do
-    :ok = :gen_event.swap_sup_handler(
-      :erl_signal_server,
-      {:erl_signal_handler, []},
-      {Faktory.SignalHandler, []}
-    )
-    children = [Faktory.Registry]
+    :ok = Faktory.Logger.Socket.init()
+    :ok = Faktory.Logger.Connection.init()
+    :ok = Faktory.Logger.Command.init()
+    :ok = Faktory.Logger.Job.init()
+
+    children = [
+      Faktory.DefaultClient,
+      Faktory.DefaultWorker,
+    ]
+
     Supervisor.start_link(children, strategy: :one_for_one)
   end
 end

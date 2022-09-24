@@ -1,57 +1,102 @@
 defmodule Mix.Tasks.Faktory do
+  @shortdoc "Start Faktory workers"
+
   @moduledoc """
-  Use this to start up the worker and start shreddin through your work!
+  Startup all configured Faktory workers.
 
-  ```
+  ## Command line options
+
+  * `--only, -o` Only startup specified workers.
+  * `--except, -e` Startup all except specified workers.
+
+  ## Examples
+  ```sh
   mix faktory
+
+  mix faktory -o FooWorker
+  mix faktory -e BarWorker
+
+  mix faktory --only FooWorker,BarWorker
+  mix faktory -o FooWorker -o BarWorker
+
+  mix faktory --except FooWorker,BarWorker
+  mix faktory -e FooWorker -e BarWorker
   ```
-
-  Run `mix factory -h` for usage information.
-
-  Command line arguments will override configuration defined in modules.
-
-  Command line arguments only affect worker configuration (not client configuration).
   """
 
   use Mix.Task
 
-  @shortdoc "Start Faktory worker"
+  @switches [
+    only: :keep,
+    except: :keep,
+  ]
+
+  @aliases [
+    o: :only,
+    e: :except,
+  ]
+
+  @defaults [
+    only: [],
+    except: [],
+  ]
 
   @doc false
   def run(args) do
-    OptionParser.parse(args,
-      strict: [concurrency: :integer, queues: :string, pool: :integer, tls: :boolean],
-      aliases: [c: :concurrency, q: :queues, p: :pool, t: :tls]
-    ) |> case do
-      {options, [], []} -> start(options)
-      _ ->
-        print_usage()
-        exit(:normal)
+    Mix.Task.run("app.config")
+    {opts, args} = OptionParser.parse!(args, strict: @switches, aliases: @aliases)
+    opts = Keyword.merge(@defaults, opts)
+
+    only = normalize_only_except(opts[:only])
+    except = normalize_only_except(opts[:except])
+
+    if only != [] and except != [] do
+      Mix.shell().error("--only and --except are mutually exclusive")
+      System.halt(1)
     end
+
+    cond do
+      only == [] and except == [] ->
+        Application.put_env(:faktory_worker_ex, :start_workers, true)
+
+      only != [] ->
+        Application.put_env(:faktory_worker_ex, :start_workers, :only)
+        Enum.each(only, &start_worker(&1, true))
+
+      except != [] ->
+        Application.put_env(:faktory_worker_ex, :start_workers, :except)
+        Enum.each(except, &start_worker(&1, false))
+    end
+
+    Mix.Tasks.Run.run run_args() ++ args
   end
 
-  defp start(options) do
-    # Signify that we want to start the workers.
-    Faktory.put_env(:start_workers, true)
+  defp start_worker(module, bool) do
+    app = Application.get_application(module)
 
-    # Store our cli options.
-    Faktory.put_env(:cli_options, options)
+    if !app do
+      Mix.shell().error("Cannot find application for #{inspect module}")
+      System.halt(1)
+    end
 
-    # Easy enough.
-    Mix.Task.run "app.start"
+    env = Application.get_env(app, module, [])
+    |> Keyword.update(:start, bool, fn _ -> bool end)
 
-    # Do the equivalent of --no-halt unless running in IEx.
-    unless IEx.started?, do: Process.sleep(:infinity)
+    Application.put_env(app, module, env, persistent: true)
   end
 
-  defp print_usage do
-    IO.puts """
-    mix faktory [options]
+  defp normalize_only_except(items) do
+    List.wrap(items)
+    |> Enum.flat_map(&String.split(&1, ","))
+    |> Enum.map(&Module.safe_concat([&1]))
+  end
 
-    -c, --concurrency  Number of worker processes
-    -q, --queues       Space seperated list of queues
-    -t, --tls          Enable TLS when connecting to Faktory server. Default: disable TLS
-    """
+  defp run_args do
+    if iex_running?(), do: [], else: ["--no-halt"]
+  end
+
+  defp iex_running? do
+    Code.ensure_loaded?(IEx) and IEx.started?()
   end
 
 end

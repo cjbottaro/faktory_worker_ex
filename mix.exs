@@ -1,7 +1,7 @@
 defmodule Faktory.Mixfile do
   use Mix.Project
 
-  @version "0.7.0"
+  @version "1.0.0"
 
   def project do
     [
@@ -24,19 +24,23 @@ defmodule Faktory.Mixfile do
       # Docs
       docs: [
         extras: [
-          "README.md": [title: "README", name: "readme"],
+          "README.md": [title: "README"],
           "CHANGELOG.md": [title: "CHANGELOG"],
-          "Architecture.md": [title: "Architecture"],
         ],
-        main: "readme",
-      ]
+        main: "README",
+        groups_for_modules: [
+          "Logging": [~r/Faktory\.Logger\.\w+/],
+        ],
+      ],
+
+      xref: [exclude: IEx]
     ]
   end
 
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger],
+      extra_applications: [:logger, :crypto, :ssl],
       mod: {Faktory.Application, []}
     ]
   end
@@ -46,16 +50,19 @@ defmodule Faktory.Mixfile do
     [
       {:connection, "~> 1.0"},
       {:jason, "~> 1.1"},
-      {:poolboy, "~> 1.5"},
-      {:socket, "~> 0.3"},
-      {:gen_stage, "~> 0.14"},
+      {:gen_stage, "~> 1.0"},
+      {:nimble_pool, "~> 0.0"},
+      {:telemetry, "~> 0.4 or ~> 1.0"},
       {:ex_doc, "~> 0.19", only: :dev},
-      {:mox, "~> 0.3", only: :test},
     ]
   end
 
   defp elixirc_paths(:test) do
     ["lib", "test/support"]
+  end
+
+  defp elixirc_paths(:dev) do
+    ["lib", "dev"]
   end
 
   defp elixirc_paths(_) do
@@ -64,7 +71,7 @@ defmodule Faktory.Mixfile do
 
   defp aliases do
     [
-      # compile: ["compile --warnings-as-errors"]
+      compile: ["compile --warnings-as-errors"]
     ]
   end
 end

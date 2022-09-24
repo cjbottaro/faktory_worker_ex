@@ -1,50 +1,80 @@
 defmodule Faktory.Protocol do
   @moduledoc false
 
-  # So we can use our send/2 defined below.
-  import Kernel, except: [send: 2]
+  @type success       :: {:ok, binary}
+  @type network_error :: {:error, reason :: binary}
+  @type server_error  :: {:ok, {:error, reason :: binary}}
 
-  def push(conn, job) when is_list(job), do: push(conn, Map.new(job))
+  @type conn :: Faktory.Connection.t
+  @type job :: Map.t | Keyword.t
 
-  def push(conn, job) do
-    payload = Jason.encode!(job)
+  @type jid :: binary
 
-    with :ok <- send(conn, "PUSH #{payload}"),
-      {:ok, "+OK"} <- recv(conn, :line)
-    do
-      job["jid"]
+  def hello(greeting, config) do
+    # %{
+    #   password: state.password,
+    #   hostname: Utils.hostname,
+    #   pid: Utils.unix_pid,
+    #   labels: ["elixir"],
+    #   v: 2,
+    # }
+
+    payload = %{
+      hostname: Faktory.Utils.hostname(),
+      pid: Faktory.Utils.unix_pid(),
+      labels: ["elixir"],
+      v: 2
+    }
+
+    payload = case greeting do
+      %{"s" => s, "i" => i} ->
+        pwdhash = Faktory.Utils.hash_password(config.password || "", s, i)
+        Map.put(payload, "pwdhash", pwdhash)
+
+      _ -> payload
     end
-  end
 
-  def fetch(conn, queues) when is_list(queues) do
-    fetch(conn, Enum.join(queues, " "))
-  end
-
-  def fetch(conn, queues) when is_binary(queues) do
-    with :ok <- send(conn, "FETCH #{queues}"),
-      {:ok, <<"$", size::binary>>} <- recv(conn, :line),
-      {:size, size} when size != "-1" <- {:size, size},
-      {:ok, json} <- recv(conn, String.to_integer(size)),
-      {:ok, ""} <- recv(conn, :line)
-    do
-      {:ok, Jason.decode!(json)}
+    payload = if config.wid do
+      Map.put(payload, :wid, config.wid)
     else
-      {:size, "-1"} -> {:ok, nil}
-      error -> error
+      payload
     end
+
+    payload = if config.username do
+      Map.put(payload, :username, config.username)
+    else
+      payload
+    end
+
+    ["HELLO", " ", Jason.encode!(payload), "\r\n"]
   end
 
-  def ack(conn, jid) when is_binary(jid) do
-    payload = %{"jid" => jid} |> Jason.encode!
-
-    with :ok <- send(conn, "ACK #{payload}"),
-      {:ok, "+OK"} <- recv(conn, :line)
-    do
-      {:ok, jid}
-    end
+  def info do
+    ["INFO", "\r\n"]
   end
 
-  def fail(conn, jid, errtype, message, backtrace) do
+  def push(job) do
+    ["PUSH", " ", Jason.encode!(job), "\r\n"]
+  end
+
+  def fetch(queues) do
+    ["FETCH", " ", queues, "\r\n"]
+  end
+
+  def ack(jid) do
+    ["ACK", " ", Jason.encode!(%{jid: jid}), "\r\n"]
+  end
+
+  def beat(wid) do
+    rss_kb = (:erlang.memory(:total) / 1024) |> round()
+    ["BEAT", " ", Jason.encode!(%{wid: wid, rss_kb: rss_kb}), "\r\n"]
+  end
+
+  def flush do
+    ["FLUSH", "\r\n"]
+  end
+
+  def fail(jid, errtype, message, backtrace) do
     payload = %{
       jid: jid,
       errtype: errtype,
@@ -52,60 +82,11 @@ defmodule Faktory.Protocol do
       backtrace: backtrace
     } |> Jason.encode!
 
-    with :ok <- send(conn, "FAIL #{payload}"),
-      {:ok, "+OK"} <- recv(conn, :line)
-    do
-      {:ok, jid}
-    end
+    ["FAIL", " ", payload, "\r\n"]
   end
 
-  def info(conn) do
-    with :ok <- send(conn, "INFO"),
-      {:ok, <<"$", size::binary>>} <- recv(conn, :line),
-      size = String.to_integer(size),
-      {:ok, json} <- recv(conn, size),
-      {:ok, ""} <- recv(conn, :line)
-    do
-      Jason.decode(json)
-    end
-  end
-
-  def beat(conn, wid) do
-    payload = %{wid: wid} |> Jason.encode!
-
-    with :ok <- send(conn, "BEAT #{payload}"),
-      {:ok, "+OK"} <- recv(conn, :line)
-    do
-      :ok
-    else
-      {:ok, json} -> {:ok, Jason.decode!(json)}
-      error -> error
-    end
-  end
-
-  def flush(conn) do
-    with :ok <- send(conn, "FLUSH"),
-      {:ok, "+OK"} <- recv(conn, :line)
-    do
-      :ok
-    end
-  end
-
-  defp send(conn, data) do
-    Faktory.Connection.send(conn, data)
-  end
-
-  defp recv(conn, :line) do
-    case Faktory.Connection.recv(conn, :line) do
-      {:ok, <<"-ERR ", reason::binary>>} -> {:error, reason}
-      {:ok, <<"-SHUTDOWN ", reason::binary>>} -> {:error, reason}
-      {:ok, line} -> {:ok, line}
-      error -> error
-    end
-  end
-
-  defp recv(conn, size) do
-    Faktory.Connection.recv(conn, size)
+  def mutate(mutation) do
+    ["MUTATE", " ", Jason.encode!(mutation), "\r\n"]
   end
 
 end

@@ -1,0 +1,2 @@
+stunnel: /usr/bin/stunnel /stunnel.conf
+faktory: ./faktory -b :7419 -w :7420 -l debug -e production
